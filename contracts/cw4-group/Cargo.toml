@@ -1,6 +1,6 @@
 [package]
 name = "cw4-group"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Simple cw4 implementation of group membership controlled by admin "
@@ -20,19 +20,17 @@ exclude = [
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 
 [dependencies]
-cosmwasm-schema = { version = "1.4.0" }
-cw-utils = "1.0.1"
-cw2 = "1.1.2"
-cw4 = { path = "../../packages/cw4", version = "1.1.2" }
-cw-controllers = "1.1.2"
-cw-storage-plus = "1.1.0"
-cosmwasm-std = { version = "1.4.0" }
-schemars = "0.8.15"
-serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.49" }
+cosmwasm-schema = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw4 = { workspace = true }
+cw-controllers = { workspace = true }
+cw-storage-plus = { workspace = true }
+cosmwasm-std = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

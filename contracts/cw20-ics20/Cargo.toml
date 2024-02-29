@@ -1,6 +1,6 @@
 [package]
 name = "cw20-ics20"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "IBC Enabled contracts that receives CW20 tokens and sends them over ICS20 to a remote chain"
@@ -13,19 +13,18 @@ documentation = "https://docs.cosmwasm.com"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all init/handle/query exports
 library = []
 
 [dependencies]
-cosmwasm-schema = { version = "1.4.0" }
-cw-utils = "1.0.1"
-cw2 = "1.1.2"
-cw20 = { path = "../../packages/cw20", version = "1.1.2" }
-cosmwasm-std = { version = "1.4.0", features = ["stargate"] }
-cw-storage-plus = "1.1.0"
-cw-controllers = "1.1.2"
-schemars = "0.8.15"
-semver = "1"
-serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.49" }
+cosmwasm-schema = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw20 = { workspace = true }
+cosmwasm-std = { workspace = true, features = ["stargate"] }
+cw-storage-plus = { workspace = true }
+cw-controllers = { workspace = true }
+schemars = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
