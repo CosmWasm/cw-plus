@@ -13,18 +13,17 @@ documentation = "https://docs.cosmwasm.com"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 test-utils = []
 
 [dependencies]
-cosmwasm-schema = { workspace = true }
-cw-utils = { workspace = true }
+cosmwasm-schema = "2.0.0-rc.1"
+cw-utils = "2.0.0-rc.0"
 cw1 = { workspace = true }
-cw2 = { workspace = true }
-cosmwasm-std = { workspace = true, features = ["staking"] }
-cw-storage-plus = { workspace = true }
+cw2 = "2.0.0-rc.0"
+cosmwasm-std = { version = "2.0.0-rc.1", features = ["staking"] }
+cw-storage-plus = "2.0.0-rc.0"
 schemars = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
@@ -32,5 +31,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 anyhow = "1"
 assert_matches = "1"
-cw-multi-test = { workspace = true }
+# temporary
+cw-multi-test = { git = "https://github.com/CosmWasm/cw-multi-test.git", branch = "v2" }
 derivative = "2"
+easy-addr = { path = "../../packages/easy-addr" }
