@@ -5,8 +5,8 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, ensure_ne, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg,
-    Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
+    ensure, ensure_ne, to_json_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut,
+    DistributionMsg, Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
 };
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
@@ -304,17 +304,17 @@ where
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
-        QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, env, spender)?),
-        QueryMsg::Permissions { spender } => to_binary(&query_permissions(deps, spender)?),
+        QueryMsg::AdminList {} => to_json_binary(&query_admin_list(deps)?),
+        QueryMsg::Allowance { spender } => to_json_binary(&query_allowance(deps, env, spender)?),
+        QueryMsg::Permissions { spender } => to_json_binary(&query_permissions(deps, spender)?),
         QueryMsg::CanExecute { sender, msg } => {
-            to_binary(&query_can_execute(deps, env, sender, msg)?)
+            to_json_binary(&query_can_execute(deps, env, sender, msg)?)
         }
         QueryMsg::AllAllowances { start_after, limit } => {
-            to_binary(&query_all_allowances(deps, env, start_after, limit)?)
+            to_json_binary(&query_all_allowances(deps, env, start_after, limit)?)
         }
         QueryMsg::AllPermissions { start_after, limit } => {
-            to_binary(&query_all_permissions(deps, start_after, limit)?)
+            to_json_binary(&query_all_permissions(deps, start_after, limit)?)
         }
     }
 }
@@ -453,7 +453,7 @@ pub fn query_all_permissions(
 }
 
 // Migrate contract if version is lower than current version
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse()?;
     let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;

@@ -1,6 +1,6 @@
 [package]
 name = "cw4"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "CosmWasm-4 Interface: Groups Members"

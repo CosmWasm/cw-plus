@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{to_json_binary, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
 
 /// Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg
 #[cw_serde]
@@ -12,14 +12,14 @@ pub struct Cw20ReceiveMsg {
 
 impl Cw20ReceiveMsg {
     /// serializes the message
-    pub fn into_binary(self) -> StdResult<Binary> {
+    pub fn into_json_binary(self) -> StdResult<Binary> {
         let msg = ReceiverExecuteMsg::Receive(self);
-        to_binary(&msg)
+        to_json_binary(&msg)
     }
 
     /// creates a cosmos_msg sending this struct to the named contract
     pub fn into_cosmos_msg<T: Into<String>>(self, contract_addr: T) -> StdResult<CosmosMsg> {
-        let msg = self.into_binary()?;
+        let msg = self.into_json_binary()?;
         let execute = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
             msg,

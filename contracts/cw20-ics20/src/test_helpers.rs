@@ -75,7 +75,7 @@ pub fn setup(
         gov_contract: "gov".to_string(),
         allowlist,
     };
-    let info = mock_info(&String::from("anyone"), &[]);
+    let info = mock_info("anyone", &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
     assert_eq!(0, res.messages.len());
 
