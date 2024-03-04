@@ -205,7 +205,7 @@ mod tests {
         let info = mock_info(&bob, &[]);
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
-            admins: vec![alice.to_string(), bob.to_string()],
+            admins: vec![alice.to_string(), bob],
             mutable: false,
         };
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
@@ -229,7 +229,7 @@ mod tests {
 
         // instantiate the contract
         let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.to_string(), carl.to_string()],
+            admins: vec![alice, carl.to_string()],
             mutable: false,
         };
         let info = mock_info(&bob, &[]);
@@ -296,11 +296,11 @@ mod tests {
         });
 
         // owner can send
-        let res = query_can_execute(deps.as_ref(), alice.to_string(), send_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), alice, send_msg.clone()).unwrap();
         assert!(res.can_execute);
 
         // owner can stake
-        let res = query_can_execute(deps.as_ref(), bob.to_string(), staking_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), bob, staking_msg.clone()).unwrap();
         assert!(res.can_execute);
 
         // anyone cannot send
