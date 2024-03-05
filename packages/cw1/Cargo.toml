@@ -9,7 +9,7 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
-cosmwasm-schema = "2.0.0-rc.1"
-cosmwasm-std = "2.0.0-rc.1"
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

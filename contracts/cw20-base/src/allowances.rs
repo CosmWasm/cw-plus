@@ -294,8 +294,8 @@ mod tests {
     fn increase_decrease_allowances() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let owner = String::from("addr0001");
-        let spender = String::from("addr0002");
+        let owner = deps.api.addr_make("addr0001").to_string();
+        let spender = deps.api.addr_make("addr0002").to_string();
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), owner.clone(), Uint128::new(12340000));
@@ -376,9 +376,9 @@ mod tests {
     fn allowances_independent() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let owner = String::from("addr0001");
-        let spender = String::from("addr0002");
-        let spender2 = String::from("addr0003");
+        let owner = deps.api.addr_make("addr0001").to_string();
+        let spender = deps.api.addr_make("addr0002").to_string();
+        let spender2 = deps.api.addr_make("addr0003").to_string();
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
@@ -471,7 +471,7 @@ mod tests {
     fn no_self_allowance() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let owner = String::from("addr0001");
+        let owner = deps.api.addr_make("addr0001").to_string();
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
@@ -498,9 +498,9 @@ mod tests {
     #[test]
     fn transfer_from_respects_limits() {
         let mut deps = mock_dependencies_with_balance(&[]);
-        let owner = String::from("addr0001");
-        let spender = String::from("addr0002");
-        let rcpt = String::from("addr0003");
+        let owner = deps.api.addr_make("addr0001").to_string();
+        let spender = deps.api.addr_make("addr0002").to_string();
+        let rcpt = deps.api.addr_make("addr0003").to_string();
 
         let start = Uint128::new(999999);
         do_instantiate(deps.as_mut(), &owner, start);
@@ -580,8 +580,8 @@ mod tests {
     #[test]
     fn burn_from_respects_limits() {
         let mut deps = mock_dependencies_with_balance(&[]);
-        let owner = String::from("addr0001");
-        let spender = String::from("addr0002");
+        let owner = deps.api.addr_make("addr0001").to_string();
+        let spender = deps.api.addr_make("addr0002").to_string();
 
         let start = Uint128::new(999999);
         do_instantiate(deps.as_mut(), &owner, start);
@@ -658,9 +658,9 @@ mod tests {
     #[test]
     fn send_from_respects_limits() {
         let mut deps = mock_dependencies_with_balance(&[]);
-        let owner = String::from("addr0001");
-        let spender = String::from("addr0002");
-        let contract = String::from("cool-dex");
+        let owner = deps.api.addr_make("addr0001").to_string();
+        let spender = deps.api.addr_make("addr0002").to_string();
+        let contract = deps.api.addr_make("addr0003").to_string();
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
         let start = Uint128::new(999999);
@@ -764,8 +764,8 @@ mod tests {
     fn no_past_expiration() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let owner = String::from("addr0001");
-        let spender = String::from("addr0002");
+        let owner = deps.api.addr_make("addr0001").to_string();
+        let spender = deps.api.addr_make("addr0002").to_string();
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), owner.clone(), Uint128::new(12340000));
