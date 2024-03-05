@@ -72,7 +72,7 @@ pub fn setup(
     let instantiate_msg = InitMsg {
         default_gas_limit: None,
         default_timeout: DEFAULT_TIMEOUT,
-        gov_contract: "gov".to_string(),
+        gov_contract: deps.api.addr_make("gov").to_string(),
         allowlist,
     };
     let info = mock_info("anyone", &[]);

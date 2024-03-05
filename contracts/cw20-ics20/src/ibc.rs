@@ -201,13 +201,13 @@ pub fn ibc_packet_receive(
     let packet = msg.packet;
 
     do_ibc_packet_receive(deps, &packet).or_else(|err| {
-        Ok(IbcReceiveResponse::new()
-            .set_ack(ack_fail(err.to_string()))
-            .add_attributes(vec![
+        Ok(
+            IbcReceiveResponse::new(ack_fail(err.to_string())).add_attributes(vec![
                 attr("action", "receive"),
                 attr("success", "false"),
                 attr("error", err.to_string()),
-            ]))
+            ]),
+        )
     })
 }
 
@@ -265,8 +265,7 @@ fn do_ibc_packet_receive(
     let mut submsg = SubMsg::reply_on_error(send, RECEIVE_ID);
     submsg.gas_limit = gas_limit;
 
-    let res = IbcReceiveResponse::new()
-        .set_ack(ack_success())
+    let res = IbcReceiveResponse::new(ack_success())
         .add_submessage(submsg)
         .add_attribute("action", "receive")
         .add_attribute("sender", msg.sender)
@@ -403,8 +402,10 @@ mod test {
     use crate::contract::{execute, migrate, query_channel};
     use crate::msg::{ExecuteMsg, MigrateMsg, TransferMsg};
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, to_json_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
+    use cosmwasm_std::{coins, to_json_vec, Addr, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
     use cw20::Cw20ReceiveMsg;
+
+    use easy_addr::addr;
 
     #[test]
     fn check_ack_json() {
@@ -496,11 +497,11 @@ mod test {
     #[test]
     fn send_receive_cw20() {
         let send_channel = "channel-9";
-        let cw20_addr = "token-addr";
-        let cw20_denom = "cw20:token-addr";
-        let local_rcpt = "local-rcpt";
-        let local_sender = "local-sender";
-        let remote_rcpt = "remote-rcpt";
+        let cw20_addr = addr!("token-addr");
+        let cw20_denom = concat!("cw20:", addr!("token-addr"));
+        let local_rcpt = addr!("local-rcpt");
+        let local_sender = addr!("local-sender");
+        let remote_rcpt = addr!("remote-rcpt");
         let gas_limit = 1234567;
         let mut deps = setup(
             &["channel-1", "channel-7", send_channel],
@@ -513,10 +514,10 @@ mod test {
             mock_receive_packet(send_channel, 1876543210, cw20_denom, local_rcpt);
 
         // cannot receive this denom yet
-        let msg = IbcPacketReceiveMsg::new(recv_packet.clone());
+        let msg = IbcPacketReceiveMsg::new(recv_packet.clone(), Addr::unchecked(""));
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
-        let ack: Ics20Ack = from_json(res.acknowledgement).unwrap();
+        let ack: Ics20Ack = from_json(res.acknowledgement.unwrap()).unwrap();
         let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
         assert_eq!(ack, no_funds);
 
@@ -559,21 +560,21 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
 
         // cannot receive more than we sent
-        let msg = IbcPacketReceiveMsg::new(recv_high_packet);
+        let msg = IbcPacketReceiveMsg::new(recv_high_packet, Addr::unchecked(""));
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
-        let ack: Ics20Ack = from_json(res.acknowledgement).unwrap();
+        let ack: Ics20Ack = from_json(res.acknowledgement.unwrap()).unwrap();
         assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
-        let msg = IbcPacketReceiveMsg::new(recv_packet);
+        let msg = IbcPacketReceiveMsg::new(recv_packet, Addr::unchecked(""));
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
             cw20_payment(876543210, cw20_addr, local_rcpt, Some(gas_limit)),
             res.messages[0]
         );
-        let ack: Ics20Ack = from_json(res.acknowledgement).unwrap();
+        let ack: Ics20Ack = from_json(res.acknowledgement.unwrap()).unwrap();
         assert!(matches!(ack, Ics20Ack::Result(_)));
 
         // TODO: we need to call the reply block
@@ -596,10 +597,10 @@ mod test {
         let recv_high_packet = mock_receive_packet(send_channel, 1876543210, denom, "local-rcpt");
 
         // cannot receive this denom yet
-        let msg = IbcPacketReceiveMsg::new(recv_packet.clone());
+        let msg = IbcPacketReceiveMsg::new(recv_packet.clone(), Addr::unchecked(""));
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
-        let ack: Ics20Ack = from_json(res.acknowledgement).unwrap();
+        let ack: Ics20Ack = from_json(res.acknowledgement.unwrap()).unwrap();
         let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
         assert_eq!(ack, no_funds);
 
@@ -619,21 +620,21 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
 
         // cannot receive more than we sent
-        let msg = IbcPacketReceiveMsg::new(recv_high_packet);
+        let msg = IbcPacketReceiveMsg::new(recv_high_packet, Addr::unchecked(""));
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
-        let ack: Ics20Ack = from_json(res.acknowledgement).unwrap();
+        let ack: Ics20Ack = from_json(res.acknowledgement.unwrap()).unwrap();
         assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
-        let msg = IbcPacketReceiveMsg::new(recv_packet);
+        let msg = IbcPacketReceiveMsg::new(recv_packet, Addr::unchecked(""));
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
             native_payment(876543210, denom, "local-rcpt"),
             res.messages[0]
         );
-        let ack: Ics20Ack = from_json(res.acknowledgement).unwrap();
+        let ack: Ics20Ack = from_json(res.acknowledgement.unwrap()).unwrap();
         assert!(matches!(ack, Ics20Ack::Result(_)));
 
         // only need to call reply block on error case
@@ -647,7 +648,7 @@ mod test {
     #[test]
     fn check_gas_limit_handles_all_cases() {
         let send_channel = "channel-9";
-        let allowed = "foobar";
+        let allowed = addr!("foobar");
         let allowed_gas = 777666;
         let mut deps = setup(&[send_channel], &[(allowed, allowed_gas)]);
 
@@ -656,7 +657,7 @@ mod test {
         assert_eq!(limit, Some(allowed_gas));
 
         // non-allow list will error
-        let random = "tokenz";
+        let random = addr!("tokenz");
         check_gas_limit(deps.as_ref(), &Amount::cw20(500, random)).unwrap_err();
 
         // add default_gas_limit

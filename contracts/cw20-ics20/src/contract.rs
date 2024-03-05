@@ -387,6 +387,8 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, CosmosMsg, IbcMsg, StdError, Uint128};
 
+    use easy_addr::addr;
+
     use crate::state::ChannelState;
     use cw_utils::PaymentError;
 
@@ -426,8 +428,8 @@ mod test {
 
     #[test]
     fn proper_checks_on_execute_native() {
-        let foobar = "foobar";
-        let foreign = "foreign-address";
+        let foobar = addr!("foobar");
+        let foreign = addr!("foreign-address");
 
         let send_channel = "channel-5";
         let mut deps = setup(&[send_channel, "channel-10"], &[]);
@@ -491,9 +493,9 @@ mod test {
     #[test]
     fn proper_checks_on_execute_cw20() {
         let send_channel = "channel-15";
-        let cw20_addr = "my-token";
-        let foreign = "foreign-address";
-        let sender = "my-account";
+        let cw20_addr = addr!("my-token");
+        let foreign = addr!("foreign-address");
+        let sender = addr!("my-account");
         let mut deps = setup(&["channel-3", send_channel], &[(cw20_addr, 123456)]);
 
         let transfer = TransferMsg {
@@ -542,15 +544,18 @@ mod test {
         let send_channel = "channel-15";
         let mut deps = setup(&[send_channel], &[]);
 
-        let cw20_addr = "my-token";
+        let my_account = addr!("my-account");
+        let cw20_addr = addr!("my-token");
+        let foreign = addr!("foreign-address");
+
         let transfer = TransferMsg {
             channel: send_channel.to_string(),
-            remote_address: "foreign-address".to_string(),
+            remote_address: foreign.to_string(),
             timeout: Some(7777),
             memo: None,
         };
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-            sender: "my-account".into(),
+            sender: my_account.into(),
             amount: Uint128::new(888777666),
             msg: to_json_binary(&transfer).unwrap(),
         });
@@ -578,13 +583,14 @@ mod test {
     fn v3_migration_works() {
         // basic state with one channel
         let send_channel = "channel-15";
-        let cw20_addr = "my-token";
+        let cw20_addr = addr!("my-token");
         let native = "ucosm";
         let mut deps = setup(&[send_channel], &[(cw20_addr, 123456)]);
 
         // mock that we sent some tokens in both native and cw20 (TODO: cw20)
         // balances set high
         deps.querier
+            .bank
             .update_balance(MOCK_CONTRACT_ADDR, coins(50000, native));
         // pretend this is an old contract - set version explicitly
         set_contract_version(deps.as_mut().storage, CONTRACT_NAME, MIGRATE_VERSION_3).unwrap();

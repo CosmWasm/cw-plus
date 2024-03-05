@@ -28,3 +28,6 @@ schemars = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+easy-addr = { workspace = true }

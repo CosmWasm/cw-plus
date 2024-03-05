@@ -367,6 +367,7 @@ dependencies = [
  "cw-utils",
  "cw2",
  "cw20",
+ "easy-addr",
  "schemars",
  "semver",
  "serde",
