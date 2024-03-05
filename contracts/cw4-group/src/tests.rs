@@ -10,10 +10,12 @@ use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{ADMIN, HOOKS};
 use crate::ContractError;
 
-const INIT_ADMIN: &str = "juan";
-const USER1: &str = "somebody";
-const USER2: &str = "else";
-const USER3: &str = "funny";
+use easy_addr::addr;
+
+const INIT_ADMIN: &str = addr!("juan");
+const USER1: &str = addr!("somebody");
+const USER2: &str = addr!("else");
+const USER3: &str = addr!("funny");
 
 fn set_up(deps: DepsMut) {
     let msg = InstantiateMsg {
@@ -278,8 +280,8 @@ fn add_remove_hooks() {
     let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
     assert!(hooks.hooks.is_empty());
 
-    let contract1 = "hook1".to_string();
-    let contract2 = "hook2".to_string();
+    let contract1 = deps.api.addr_make("hook1").to_string();
+    let contract2 = deps.api.addr_make("hook2").to_string();
 
     let add_msg = ExecuteMsg::AddHook {
         addr: contract1.clone(),
@@ -346,8 +348,8 @@ fn hooks_fire() {
     let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
     assert!(hooks.hooks.is_empty());
 
-    let contract1 = "hook1".to_string();
-    let contract2 = "hook2".to_string();
+    let contract1 = deps.api.addr_make("hook1").to_string();
+    let contract2 = deps.api.addr_make("hook2").to_string();
 
     // register 2 hooks
     let admin_info = mock_info(INIT_ADMIN, &[]);
