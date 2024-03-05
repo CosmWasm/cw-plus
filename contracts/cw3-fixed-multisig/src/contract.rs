@@ -421,6 +421,8 @@ mod tests {
     use cw2::{get_contract_version, ContractVersion};
     use cw_utils::{Duration, Threshold};
 
+    use easy_addr::addr;
+
     use crate::msg::Voter;
 
     use super::*;
@@ -437,15 +439,15 @@ mod tests {
         env
     }
 
-    const OWNER: &str = "admin0001";
-    const VOTER1: &str = "voter0001";
-    const VOTER2: &str = "voter0002";
-    const VOTER3: &str = "voter0003";
-    const VOTER4: &str = "voter0004";
-    const VOTER5: &str = "voter0005";
-    const VOTER6: &str = "voter0006";
-    const NOWEIGHT_VOTER: &str = "voterxxxx";
-    const SOMEBODY: &str = "somebody";
+    const OWNER: &str = addr!("admin0001");
+    const VOTER1: &str = addr!("voter0001");
+    const VOTER2: &str = addr!("voter0002");
+    const VOTER3: &str = addr!("voter0003");
+    const VOTER4: &str = addr!("voter0004");
+    const VOTER5: &str = addr!("voter0005");
+    const VOTER6: &str = addr!("voter0006");
+    const NOWEIGHT_VOTER: &str = addr!("voterxxxx");
+    const SOMEBODY: &str = addr!("somebody");
 
     fn voter<T: Into<String>>(addr: T, weight: u64) -> Voter {
         Voter {

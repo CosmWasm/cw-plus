@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use cosmwasm_std::{to_json_binary, Addr, Empty, Uint128, WasmMsg};
+use cosmwasm_std::{to_json_binary, Empty, Uint128, WasmMsg};
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
@@ -36,9 +36,9 @@ fn cw3_controls_cw20() {
     // setup cw3 multisig with 3 accounts
     let cw3_id = router.store_code(contract_cw3_fixed_multisig());
 
-    let addr1 = Addr::unchecked("addr1");
-    let addr2 = Addr::unchecked("addr2");
-    let addr3 = Addr::unchecked("addr3");
+    let addr1 = router.api().addr_make("addr1");
+    let addr2 = router.api().addr_make("addr2");
+    let addr3 = router.api().addr_make("addr3");
     let cw3_instantiate_msg = InstantiateMsg {
         voters: vec![
             Voter {
@@ -95,7 +95,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // mint some cw20 tokens according to proposal result
-    let mint_recipient = Addr::unchecked("recipient");
+    let mint_recipient = router.api().addr_make("mint_recipient");
     let mint_amount = Uint128::new(1000);
     let cw20_mint_msg = cw20_base::msg::ExecuteMsg::Mint {
         recipient: mint_recipient.to_string(),
