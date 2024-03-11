@@ -32,6 +32,6 @@ thiserror = { workspace = true }
 anyhow = "1"
 assert_matches = "1"
 # temporary
-cw-multi-test = { git = "https://github.com/CosmWasm/cw-multi-test.git", branch = "v2" }
+cw-multi-test = "2.0.0-rc.0"
 derivative = "2"
 easy-addr = { path = "../../packages/easy-addr" }
