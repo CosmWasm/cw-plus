@@ -4,6 +4,35 @@ members = ["packages/*", "contracts/*"]
 # Resolver has to be set explicitely in workspaces, see https://github.com/rust-lang/cargo/issues/9956
 resolver = "2"
 
+[workspace.package]
+version = "1.1.2"
+
+[workspace.dependencies]
+cosmwasm-schema = "1.5"
+cosmwasm-std = "1.5"
+cw2 = "1.1"
+cw-controllers = "1.1"
+cw-multi-test = "1.0.0-rc.0"
+cw-storage-plus = "1.2"
+cw-utils = "1"
+schemars = "0.8.15"
+semver = "1"
+serde = { version = "1.0.188", default-features = false, features = ["derive"] }
+thiserror = "1.0.4"
+
+cw1 = { path = "packages/cw1", version = "1.1.2" }
+cw1-whitelist = { path = "contracts/cw1-whitelist", version = "1.1.2", features = [
+    "library",
+] }
+cw20 = { path = "packages/cw20", version = "1.1.2" }
+cw20-base = { path = "contracts/cw20-base", version = "1.1.2", features = ["library"] }
+cw3 = { path = "packages/cw3", version = "1.1.2" }
+cw3-fixed-multisig = { path = "contracts/cw3-fixed-multisig", version = "1.1.2", features = [
+    "library",
+] }
+cw4 = { path = "packages/cw4", version = "1.1.2" }
+cw4-group = { path = "contracts/cw4-group", version = "1.1.2" }
+
 [profile.release.package.cw1-subkeys]
 codegen-units = 1
 incremental = false
