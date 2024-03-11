@@ -2,7 +2,8 @@ use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
 use cosmwasm_std::{
-    to_json_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError, WasmMsg, WasmQuery,
+    testing::mock_dependencies, to_json_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError,
+    WasmMsg, WasmQuery,
 };
 use cw1::Cw1Contract;
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
@@ -37,7 +38,7 @@ pub struct Suite {
 impl Suite {
     pub fn init() -> Result<Suite> {
         let mut app = mock_app();
-        let owner = "owner".to_owned();
+        let owner = mock_dependencies().api.addr_make("owner").to_string();
         let cw1_id = app.store_code(contract_cw1());
 
         Ok(Suite { app, owner, cw1_id })

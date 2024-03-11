@@ -153,9 +153,9 @@ mod tests {
     fn instantiate_and_modify_config() {
         let mut deps = mock_dependencies();
 
-        let alice = "alice";
-        let bob = "bob";
-        let carl = "carl";
+        let alice = deps.api.addr_make("alice").to_string();
+        let bob = deps.api.addr_make("bob").to_string();
+        let carl = deps.api.addr_make("carl").to_string();
 
         let anyone = "anyone";
 
@@ -186,7 +186,7 @@ mod tests {
         let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![alice.to_string(), bob.to_string()],
         };
-        let info = mock_info(alice, &[]);
+        let info = mock_info(&alice, &[]);
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // ensure expected config
@@ -197,12 +197,12 @@ mod tests {
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // carl cannot freeze it
-        let info = mock_info(carl, &[]);
+        let info = mock_info(&carl, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but bob can
-        let info = mock_info(bob, &[]);
+        let info = mock_info(&bob, &[]);
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.to_string(), bob.to_string()],
@@ -214,7 +214,7 @@ mod tests {
         let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![alice.to_string()],
         };
-        let info = mock_info(alice, &[]);
+        let info = mock_info(&alice, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
     }
@@ -223,16 +223,16 @@ mod tests {
     fn execute_messages_has_proper_permissions() {
         let mut deps = mock_dependencies();
 
-        let alice = "alice";
-        let bob = "bob";
-        let carl = "carl";
+        let alice = deps.api.addr_make("alice").to_string();
+        let bob = deps.api.addr_make("bob").to_string();
+        let carl = deps.api.addr_make("carl").to_string();
 
         // instantiate the contract
         let instantiate_msg = InstantiateMsg {
             admins: vec![alice.to_string(), carl.to_string()],
             mutable: false,
         };
-        let info = mock_info(bob, &[]);
+        let info = mock_info(&bob, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
@@ -254,12 +254,12 @@ mod tests {
         let execute_msg = ExecuteMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
-        let info = mock_info(bob, &[]);
+        let info = mock_info(&bob, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but carl can
-        let info = mock_info(carl, &[]);
+        let info = mock_info(&carl, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg).unwrap();
         assert_eq!(
             res.messages,
@@ -272,8 +272,8 @@ mod tests {
     fn can_execute_query_works() {
         let mut deps = mock_dependencies();
 
-        let alice = "alice";
-        let bob = "bob";
+        let alice = deps.api.addr_make("alice").to_string();
+        let bob = deps.api.addr_make("bob").to_string();
 
         let anyone = "anyone";
 
