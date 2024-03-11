@@ -50,6 +50,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
 
 [[package]]
+name = "bech32"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d965446196e3b7decd44aa7ee49e31d630118f90ef12f97900f262eb915c951d"
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -150,7 +156,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cb9f0cb520832e993af5cbe97bc3c163bd0c3870989e99d5f1d5499e6f28a53"
 dependencies = [
  "base64",
- "bech32",
+ "bech32 0.9.1",
  "bnum",
  "cosmwasm-crypto",
  "cosmwasm-derive",
@@ -227,9 +233,11 @@ dependencies = [
 [[package]]
 name = "cw-multi-test"
 version = "2.0.0-rc.0"
-source = "git+https://github.com/CosmWasm/cw-multi-test.git?branch=v2#0fee7978a70db3a14f8c9e3ce2eb5be509598277"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5639954f5e312c5d75b9c55411333a517db2622c7d0b6180058b469b12a58de3"
 dependencies = [
  "anyhow",
+ "bech32 0.11.0",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",

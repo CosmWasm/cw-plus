@@ -12,8 +12,7 @@ cosmwasm-schema = "2.0.0-rc.1"
 cosmwasm-std = "2.0.0-rc.1"
 cw2 = "2.0.0-rc.0"
 cw-controllers = "2.0.0-rc.0"
-# temporary git source
-cw-multi-test = { git = "https://github.com/CosmWasm/cw-multi-test.git", branch = "v2" }
+cw-multi-test = "2.0.0-rc.0"
 cw-storage-plus = "2.0.0-rc.0"
 cw-utils = "2.0.0-rc.0"
 schemars = "0.8.15"
