@@ -1,6 +1,6 @@
 [package]
 name = "cw1-subkeys"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implement subkeys for authorizing native tokens as a cw1 proxy contract"

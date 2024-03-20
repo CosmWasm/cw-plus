@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "cw1"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-subkeys"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -366,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-ics20"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -384,7 +384,7 @@ dependencies = [
 
 [[package]]
 name = "cw3"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -397,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "cw3-fixed-multisig"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -416,7 +416,7 @@ dependencies = [
 
 [[package]]
 name = "cw3-flex-multisig"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "cw4"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "cw4-group"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -466,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "cw4-stake"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -532,7 +532,7 @@ checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
 
 [[package]]
 name = "easy-addr"
-version = "1.1.2"
+version = "2.0.0-rc.0"
 dependencies = [
  "cosmwasm-std",
  "proc-macro2",
@@ -719,9 +719,9 @@ checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
 name = "opaque-debug"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "pkcs8"
@@ -735,9 +735,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.78"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
+checksum = "e835ff2298f5721608eb1a980ecaee1aef2c132bf95ecc026a11b7bf3c01c02e"
 dependencies = [
  "unicode-ident",
 ]
@@ -762,7 +762,7 @@ dependencies = [
  "itertools 0.11.0",
  "proc-macro2",
  "quote",
- "syn 2.0.52",
+ "syn 2.0.53",
 ]
 
 [[package]]
@@ -875,7 +875,7 @@ checksum = "7eb0b34b42edc17f6b7cac84a52a1c5f0e1bb2227e997ca9011ea3dd34e8610b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.52",
+ "syn 2.0.53",
 ]
 
 [[package]]
@@ -969,9 +969,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.52"
+version = "2.0.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b699d15b36d1f02c3e7c69f8ffef53de37aefae075d8488d4ba1a7788d574a07"
+checksum = "7383cd0e49fff4b6b90ca5670bfd3e9d6a733b3f90c686605aa7eec8c4996032"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -995,7 +995,7 @@ checksum = "c61f3ba182994efc43764a46c018c347bc492c79f024e705f46567b418f6d4f7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.52",
+ "syn 2.0.53",
 ]
 
 [[package]]
