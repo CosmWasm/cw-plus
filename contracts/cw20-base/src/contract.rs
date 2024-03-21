@@ -686,13 +686,14 @@ mod tests {
         #[test]
         fn basic() {
             let mut deps = mock_dependencies();
+            let addr = deps.api.addr_make("addr0000");
             let amount = Uint128::from(11223344u128);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
                 initial_balances: vec![Cw20Coin {
-                    address: String::from("addr0000"),
+                    address: addr.to_string(),
                     amount,
                 }],
                 mint: None,
@@ -712,24 +713,22 @@ mod tests {
                     total_supply: amount,
                 }
             );
-            assert_eq!(
-                get_balance(deps.as_ref(), "addr0000"),
-                Uint128::new(11223344)
-            );
+            assert_eq!(get_balance(deps.as_ref(), addr), Uint128::new(11223344));
         }
 
         #[test]
         fn mintable() {
             let mut deps = mock_dependencies();
+            let addr = deps.api.addr_make("addr0000");
             let amount = Uint128::new(11223344);
-            let minter = String::from("asmodat");
+            let minter = deps.api.addr_make("asmodat").to_string();
             let limit = Uint128::new(511223344);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
                 initial_balances: vec![Cw20Coin {
-                    address: "addr0000".into(),
+                    address: addr.to_string(),
                     amount,
                 }],
                 mint: Some(MinterResponse {
@@ -752,10 +751,7 @@ mod tests {
                     total_supply: amount,
                 }
             );
-            assert_eq!(
-                get_balance(deps.as_ref(), "addr0000"),
-                Uint128::new(11223344)
-            );
+            assert_eq!(get_balance(deps.as_ref(), addr), Uint128::new(11223344));
             assert_eq!(
                 query_minter(deps.as_ref()).unwrap(),
                 Some(MinterResponse {
@@ -769,18 +765,19 @@ mod tests {
         fn mintable_over_cap() {
             let mut deps = mock_dependencies();
             let amount = Uint128::new(11223344);
-            let minter = String::from("asmodat");
+            let minter = deps.api.addr_make("asmodat");
+            let addr = deps.api.addr_make("addr0000");
             let limit = Uint128::new(11223300);
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
                 initial_balances: vec![Cw20Coin {
-                    address: String::from("addr0000"),
+                    address: addr.to_string(),
                     amount,
                 }],
                 mint: Some(MinterResponse {
-                    minter,
+                    minter: minter.to_string(),
                     cap: Some(limit),
                 }),
                 marketing: None,
@@ -800,6 +797,9 @@ mod tests {
             #[test]
             fn basic() {
                 let mut deps = mock_dependencies();
+
+                let marketing = deps.api.addr_make("marketing");
+
                 let instantiate_msg = InstantiateMsg {
                     name: "Cash Token".to_string(),
                     symbol: "CASH".to_string(),
@@ -809,7 +809,7 @@ mod tests {
                     marketing: Some(InstantiateMarketingInfo {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
-                        marketing: Some("marketing".to_owned()),
+                        marketing: Some(marketing.to_string()),
                         logo: Some(Logo::Url("url".to_owned())),
                     }),
                 };
@@ -824,7 +824,7 @@ mod tests {
                     MarketingInfoResponse {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
-                        marketing: Some(Addr::unchecked("marketing")),
+                        marketing: Some(marketing),
                         logo: Some(LogoInfo::Url("url".to_owned())),
                     }
                 );
@@ -870,14 +870,14 @@ mod tests {
     fn can_mint_by_minter() {
         let mut deps = mock_dependencies();
 
-        let genesis = String::from("genesis");
+        let genesis = deps.api.addr_make("genesis").to_string();
         let amount = Uint128::new(11223344);
-        let minter = String::from("asmodat");
+        let minter = deps.api.addr_make("asmodat").to_string();
         let limit = Uint128::new(511223344);
         do_instantiate_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
-        let winner = String::from("lucky");
+        let winner = deps.api.addr_make("winner").to_string();
         let prize = Uint128::new(222_222_222);
         let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
@@ -915,16 +915,15 @@ mod tests {
     #[test]
     fn others_cannot_mint() {
         let mut deps = mock_dependencies();
-        do_instantiate_with_minter(
-            deps.as_mut(),
-            &String::from("genesis"),
-            Uint128::new(1234),
-            &String::from("minter"),
-            None,
-        );
+
+        let genesis = deps.api.addr_make("genesis").to_string();
+        let minter = deps.api.addr_make("minter").to_string();
+        let winner = deps.api.addr_make("winner").to_string();
+
+        do_instantiate_with_minter(deps.as_mut(), &genesis, Uint128::new(1234), &minter, None);
 
         let msg = ExecuteMsg::Mint {
-            recipient: String::from("lucky"),
+            recipient: winner,
             amount: Uint128::new(222),
         };
         let info = mock_info("anyone else", &[]);
@@ -936,19 +935,16 @@ mod tests {
     #[test]
     fn minter_can_update_minter_but_not_cap() {
         let mut deps = mock_dependencies();
-        let minter = String::from("minter");
-        let cap = Some(Uint128::from(3000000u128));
-        do_instantiate_with_minter(
-            deps.as_mut(),
-            &String::from("genesis"),
-            Uint128::new(1234),
-            &minter,
-            cap,
-        );
 
-        let new_minter = "new_minter";
+        let genesis = deps.api.addr_make("genesis").to_string();
+        let minter = deps.api.addr_make("minter").to_string();
+
+        let cap = Some(Uint128::from(3000000u128));
+        do_instantiate_with_minter(deps.as_mut(), &genesis, Uint128::new(1234), &minter, cap);
+
+        let new_minter = deps.api.addr_make("new_minter").to_string();
         let msg = ExecuteMsg::UpdateMinter {
-            new_minter: Some(new_minter.to_string()),
+            new_minter: Some(new_minter.clone()),
         };
 
         let info = mock_info(&minter, &[]);
@@ -967,17 +963,15 @@ mod tests {
     #[test]
     fn others_cannot_update_minter() {
         let mut deps = mock_dependencies();
-        let minter = String::from("minter");
-        do_instantiate_with_minter(
-            deps.as_mut(),
-            &String::from("genesis"),
-            Uint128::new(1234),
-            &minter,
-            None,
-        );
+
+        let genesis = deps.api.addr_make("genesis").to_string();
+        let minter = deps.api.addr_make("minter").to_string();
+        let new_minter = deps.api.addr_make("new_minter").to_string();
+
+        do_instantiate_with_minter(deps.as_mut(), &genesis, Uint128::new(1234), &minter, None);
 
         let msg = ExecuteMsg::UpdateMinter {
-            new_minter: Some("new_minter".to_string()),
+            new_minter: Some(new_minter),
         };
 
         let info = mock_info("not the minter", &[]);
@@ -989,15 +983,13 @@ mod tests {
     #[test]
     fn unset_minter() {
         let mut deps = mock_dependencies();
-        let minter = String::from("minter");
+
+        let genesis = deps.api.addr_make("genesis").to_string();
+        let minter = deps.api.addr_make("minter").to_string();
+        let winner = deps.api.addr_make("winner").to_string();
+
         let cap = None;
-        do_instantiate_with_minter(
-            deps.as_mut(),
-            &String::from("genesis"),
-            Uint128::new(1234),
-            &minter,
-            cap,
-        );
+        do_instantiate_with_minter(deps.as_mut(), &genesis, Uint128::new(1234), &minter, cap);
 
         let msg = ExecuteMsg::UpdateMinter { new_minter: None };
 
@@ -1014,10 +1006,10 @@ mod tests {
 
         // Check that old minter can no longer mint.
         let msg = ExecuteMsg::Mint {
-            recipient: String::from("lucky"),
+            recipient: winner,
             amount: Uint128::new(222),
         };
-        let info = mock_info("minter", &[]);
+        let info = mock_info(&minter, &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -1026,13 +1018,17 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies();
-        do_instantiate(deps.as_mut(), &String::from("genesis"), Uint128::new(1234));
+
+        let genesis = deps.api.addr_make("genesis").to_string();
+        let winner = deps.api.addr_make("winner").to_string();
+
+        do_instantiate(deps.as_mut(), &genesis, Uint128::new(1234));
 
         let msg = ExecuteMsg::Mint {
-            recipient: String::from("lucky"),
+            recipient: winner,
             amount: Uint128::new(222),
         };
-        let info = mock_info("genesis", &[]);
+        let info = mock_info(&genesis, &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -1042,9 +1038,9 @@ mod tests {
     fn instantiate_multiple_accounts() {
         let mut deps = mock_dependencies();
         let amount1 = Uint128::from(11223344u128);
-        let addr1 = String::from("addr0001");
+        let addr1 = deps.api.addr_make("addr0001").to_string();
         let amount2 = Uint128::from(7890987u128);
-        let addr2 = String::from("addr0002");
+        let addr2 = deps.api.addr_make("addr0002").to_string();
         let info = mock_info("creator", &[]);
         let env = mock_env();
 
@@ -1106,7 +1102,10 @@ mod tests {
     #[test]
     fn queries_work() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-        let addr1 = String::from("addr0001");
+
+        let addr1 = deps.api.addr_make("addr0001").to_string();
+        let addr2 = deps.api.addr_make("addr0002").to_string();
+
         let amount1 = Uint128::from(12340000u128);
 
         let expected = do_instantiate(deps.as_mut(), &addr1, amount1);
@@ -1128,14 +1127,7 @@ mod tests {
         assert_eq!(loaded.balance, amount1);
 
         // check balance query (empty)
-        let data = query(
-            deps.as_ref(),
-            env,
-            QueryMsg::Balance {
-                address: String::from("addr0002"),
-            },
-        )
-        .unwrap();
+        let data = query(deps.as_ref(), env, QueryMsg::Balance { address: addr2 }).unwrap();
         let loaded: BalanceResponse = from_json(data).unwrap();
         assert_eq!(loaded.balance, Uint128::zero());
     }
@@ -1143,8 +1135,8 @@ mod tests {
     #[test]
     fn transfer() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-        let addr1 = String::from("addr0001");
-        let addr2 = String::from("addr0002");
+        let addr1 = deps.api.addr_make("addr0001").to_string();
+        let addr2 = deps.api.addr_make("addr0002").to_string();
         let amount1 = Uint128::from(12340000u128);
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
@@ -1202,7 +1194,7 @@ mod tests {
     #[test]
     fn burn() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-        let addr1 = String::from("addr0001");
+        let addr1 = deps.api.addr_make("addr0001").to_string();
         let amount1 = Uint128::from(12340000u128);
         let burn = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
@@ -1250,8 +1242,8 @@ mod tests {
     #[test]
     fn send() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-        let addr1 = String::from("addr0001");
-        let contract = String::from("addr0002");
+        let addr1 = deps.api.addr_make("addr0001").to_string();
+        let contract = deps.api.addr_make("contract0001").to_string();
         let amount1 = Uint128::from(12340000u128);
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
@@ -1342,6 +1334,9 @@ mod tests {
         fn test_migrate() {
             let mut app = App::default();
 
+            let sender = app.api().addr_make("sender").to_string();
+            let spender = app.api().addr_make("spender").to_string();
+
             let cw20_id = app.store_code(cw20_contract());
             let cw20_addr = app
                 .instantiate_contract(
@@ -1352,7 +1347,7 @@ mod tests {
                         symbol: "TOKEN".to_string(),
                         decimals: 6,
                         initial_balances: vec![Cw20Coin {
-                            address: "sender".to_string(),
+                            address: sender.clone(),
                             amount: Uint128::new(100),
                         }],
                         mint: None,
@@ -1360,7 +1355,7 @@ mod tests {
                     },
                     &[],
                     "TOKEN",
-                    Some("sender".to_string()),
+                    Some(sender.clone()),
                 )
                 .unwrap();
 
@@ -1370,7 +1365,7 @@ mod tests {
                 .query_wasm_smart(
                     cw20_addr.to_string(),
                     &QueryMsg::AllAllowances {
-                        owner: "sender".to_string(),
+                        owner: sender.clone(),
                         start_after: None,
                         limit: None,
                     },
@@ -1384,18 +1379,18 @@ mod tests {
             let msg = CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_addr.to_string(),
                 msg: to_json_binary(&ExecuteMsg::IncreaseAllowance {
-                    spender: "spender".into(),
+                    spender: spender.clone(),
                     amount: allow1,
                     expires: Some(expires),
                 })
                 .unwrap(),
                 funds: vec![],
             });
-            app.execute(Addr::unchecked("sender"), msg).unwrap();
+            app.execute(Addr::unchecked(&sender), msg).unwrap();
 
             // Now migrate
             app.execute(
-                Addr::unchecked("sender"),
+                Addr::unchecked(&sender),
                 CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: cw20_addr.to_string(),
                     new_code_id: cw20_id,
@@ -1410,7 +1405,7 @@ mod tests {
                 .query_wasm_smart(
                     cw20_addr.clone(),
                     &QueryMsg::Balance {
-                        address: "sender".to_string(),
+                        address: sender.clone(),
                     },
                 )
                 .unwrap();
@@ -1423,7 +1418,7 @@ mod tests {
                 .query_wasm_smart(
                     cw20_addr,
                     &QueryMsg::AllSpenderAllowances {
-                        spender: "spender".to_string(),
+                        spender,
                         start_after: None,
                         limit: None,
                     },
@@ -1432,7 +1427,7 @@ mod tests {
             assert_eq!(
                 allowance.allowances,
                 &[SpenderAllowanceInfo {
-                    owner: "sender".to_string(),
+                    owner: sender,
                     allowance: allow1,
                     expires
                 }]
@@ -1446,6 +1441,10 @@ mod tests {
         #[test]
         fn update_unauthorised() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+            let marketing = deps.api.addr_make("marketing");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1455,12 +1454,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("marketing".to_owned()),
+                    marketing: Some(marketing.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1471,7 +1470,7 @@ mod tests {
                 ExecuteMsg::UpdateMarketing {
                     project: Some("New project".to_owned()),
                     description: Some("Better description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                 },
             )
             .unwrap_err();
@@ -1484,7 +1483,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("marketing")),
+                    marketing: Some(marketing),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1499,6 +1498,9 @@ mod tests {
         #[test]
         fn update_project() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1508,12 +1510,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1536,7 +1538,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("New project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1551,6 +1553,9 @@ mod tests {
         #[test]
         fn clear_project() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1560,12 +1565,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1588,7 +1593,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: None,
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1603,6 +1608,9 @@ mod tests {
         #[test]
         fn update_description() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1612,12 +1620,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1640,7 +1648,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Better description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1655,6 +1663,9 @@ mod tests {
         #[test]
         fn clear_description() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1664,12 +1675,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1692,7 +1703,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: None,
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1707,6 +1718,10 @@ mod tests {
         #[test]
         fn update_marketing() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+            let marketing = deps.api.addr_make("marketing");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1716,12 +1731,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1732,7 +1747,7 @@ mod tests {
                 ExecuteMsg::UpdateMarketing {
                     project: None,
                     description: None,
-                    marketing: Some("marketing".to_owned()),
+                    marketing: Some(marketing.to_string()),
                 },
             )
             .unwrap();
@@ -1744,7 +1759,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("marketing")),
+                    marketing: Some(marketing),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1759,6 +1774,9 @@ mod tests {
         #[test]
         fn update_marketing_invalid() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1768,12 +1786,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1799,7 +1817,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1814,6 +1832,9 @@ mod tests {
         #[test]
         fn clear_marketing() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1823,12 +1844,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1866,6 +1887,9 @@ mod tests {
         #[test]
         fn update_logo_url() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1875,12 +1899,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1899,7 +1923,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("new_url".to_owned())),
                 }
             );
@@ -1914,6 +1938,9 @@ mod tests {
         #[test]
         fn update_logo_png() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1923,12 +1950,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1947,7 +1974,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Embedded),
                 }
             );
@@ -1964,6 +1991,9 @@ mod tests {
         #[test]
         fn update_logo_svg() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -1973,12 +2003,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -1998,7 +2028,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Embedded),
                 }
             );
@@ -2015,6 +2045,9 @@ mod tests {
         #[test]
         fn update_logo_png_oversized() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -2024,12 +2057,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -2049,7 +2082,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -2064,6 +2097,9 @@ mod tests {
         #[test]
         fn update_logo_svg_oversized() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -2073,12 +2109,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -2105,7 +2141,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -2120,6 +2156,9 @@ mod tests {
         #[test]
         fn update_logo_png_invalid() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -2129,12 +2168,12 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
-            let info = mock_info("creator", &[]);
+            let info = mock_info(creator.as_str(), &[]);
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
@@ -2154,7 +2193,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -2169,6 +2208,9 @@ mod tests {
         #[test]
         fn update_logo_svg_invalid() {
             let mut deps = mock_dependencies();
+
+            let creator = deps.api.addr_make("creator");
+
             let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -2178,7 +2220,7 @@ mod tests {
                 marketing: Some(InstantiateMarketingInfo {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
+                    marketing: Some(creator.to_string()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
@@ -2204,7 +2246,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
+                    marketing: Some(creator),
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );

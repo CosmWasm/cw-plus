@@ -368,17 +368,19 @@ mod tests {
 
     use crate::error::ContractError;
 
+    use easy_addr::addr;
+
     use super::*;
 
-    const INIT_ADMIN: &str = "juan";
-    const USER1: &str = "somebody";
-    const USER2: &str = "else";
-    const USER3: &str = "funny";
+    const INIT_ADMIN: &str = addr!("juan");
+    const USER1: &str = addr!("someone");
+    const USER2: &str = addr!("else");
+    const USER3: &str = addr!("funny");
     const DENOM: &str = "stake";
     const TOKENS_PER_WEIGHT: Uint128 = Uint128::new(1_000);
     const MIN_BOND: Uint128 = Uint128::new(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
-    const CW20_ADDRESS: &str = "wasm1234567890";
+    const CW20_ADDRESS: &str = addr!("wasm");
 
     fn default_instantiate(deps: DepsMut) {
         do_instantiate(
@@ -601,8 +603,6 @@ mod tests {
             err,
             ContractError::Std(StdError::overflow(OverflowError::new(
                 OverflowOperation::Sub,
-                5000,
-                5100
             )))
         );
     }
@@ -852,8 +852,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = "hook1".to_string();
-        let contract2 = "hook2".to_string();
+        let contract1 = deps.api.addr_make("hook1").to_string();
+        let contract2 = deps.api.addr_make("hook2").to_string();
 
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
@@ -920,8 +920,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = "hook1".to_string();
-        let contract2 = "hook2".to_string();
+        let contract1 = deps.api.addr_make("hook1").to_string();
+        let contract2 = deps.api.addr_make("hook2").to_string();
 
         // register 2 hooks
         let admin_info = mock_info(INIT_ADMIN, &[]);

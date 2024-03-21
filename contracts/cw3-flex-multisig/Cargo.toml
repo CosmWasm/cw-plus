@@ -34,3 +34,4 @@ thiserror = { workspace = true }
 cw4-group = { workspace = true }
 cw-multi-test = { workspace = true }
 cw20-base = { workspace = true }
+easy-addr = { workspace = true }

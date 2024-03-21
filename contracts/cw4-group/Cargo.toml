@@ -34,3 +34,6 @@ cosmwasm-std = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+easy-addr = { workspace = true }

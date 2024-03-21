@@ -1,6 +1,6 @@
 [package]
 name = "cw1-subkeys"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implement subkeys for authorizing native tokens as a cw1 proxy contract"
@@ -13,7 +13,6 @@ documentation = "https://docs.cosmwasm.com"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 test-utils = []
@@ -36,3 +35,4 @@ cw1-whitelist = { workspace = true, features = [
   "library",
   "test-utils",
 ] }
+easy-addr = { workspace = true }
