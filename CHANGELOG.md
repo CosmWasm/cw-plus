@@ -1,5 +1,14 @@
 # Changelog
 
+## [v2.0.0](https://github.com/CosmWasm/cw-plus/tree/v2.0.0) (2024-03-26)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v2.0.0-rc.0...v2.0.0)
+
+**Merged pull requests:**
+
+- Upgraded MultiTest to version 2.0.0 [\#903](https://github.com/CosmWasm/cw-plus/pull/903) ([DariuszDepta](https://github.com/DariuszDepta))
+- Align all crates to the 2.0.0 framework [\#902](https://github.com/CosmWasm/cw-plus/pull/902) ([uint](https://github.com/uint))
+
 ## [v2.0.0-rc.0](https://github.com/CosmWasm/cw-plus/tree/v2.0.0-rc.0) (2024-03-20)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.1.2...v2.0.0-rc.0)

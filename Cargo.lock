@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "cw1"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-subkeys"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -366,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-ics20"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -384,7 +384,7 @@ dependencies = [
 
 [[package]]
 name = "cw3"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -397,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "cw3-fixed-multisig"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -416,7 +416,7 @@ dependencies = [
 
 [[package]]
 name = "cw3-flex-multisig"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "cw4"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "cw4-group"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -466,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "cw4-stake"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -532,7 +532,7 @@ checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
 
 [[package]]
 name = "easy-addr"
-version = "2.0.0-rc.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-std",
  "proc-macro2",
