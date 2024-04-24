@@ -9,7 +9,7 @@ version = "2.0.0"
 
 [workspace.dependencies]
 cosmwasm-schema = "2.0.0"
-cosmwasm-std = "2.0.0"
+cosmwasm-std = "2.0.2"
 cw2 = "2.0.0"
 cw-controllers = "2.0.0"
 cw-multi-test = "2.0.0"
