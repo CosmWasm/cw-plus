@@ -1,6 +1,6 @@
 # Migrating
 
-This guide lists API changes between *cw-plus* major releases.
+This guide lists API changes between _cw-plus_ major releases. test
 
 ## v0.13.x -> v0.14.0
 
@@ -9,8 +9,8 @@ This guide lists API changes between *cw-plus* major releases.
 - `MultiIndex` index fn params now include the pk [\#670](https://github.com/CosmWasm/cw-plus/issues/670)
 
 The `idx_fn` param of the `MultiIndex` constructor now has signature `fn(&[u8], &T) -> IK`, where the first param is the
-primary key of the index (in raw format), and the second param is the associated value.
-That allows us to use the pk or parts of it for building the index key.
+primary key of the index (in raw format), and the second param is the associated value. That allows us to use the pk or
+parts of it for building the index key.
 
 Migration of existing code is straight-forward. Just add an (unused) `_pk` param to the index function definition:
 
@@ -23,8 +23,8 @@ fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
       name_lastname: UniqueIndex::new(
 ```
 
-If you want to leverage this new functionality, take a look at the `pk_based_index()` test / example
-in `src/indexed_map.rs`.
+If you want to leverage this new functionality, take a look at the `pk_based_index()` test / example in
+`src/indexed_map.rs`.
 
 ## v0.11.0 -> v0.12.0
 
@@ -53,11 +53,12 @@ fn list_allowed(
      let allow = ALLOW_LIST
          .range(deps.storage, start, None, Order::Ascending)
 ```
+
 Here the `ALLOW_LIST` key is of type `&Addr`. That's why we use `as_ref()` before the `map()` that builds the bound.
 Notice also that this "forces" you to use `addr_validate()`, in order to build a bound over the proper type.
 
-You can still use untyped bounds, with the `ExclusiveRaw` and `InclusiveRaw` enum types.
-Migration code example, in case you want to keep your raw bounds:
+You can still use untyped bounds, with the `ExclusiveRaw` and `InclusiveRaw` enum types. Migration code example, in case
+you want to keep your raw bounds:
 
 ```diff
 pub fn query_all_allowances(
@@ -74,6 +75,7 @@ pub fn query_all_allowances(
      let allowances = ALLOWANCES
          .range(deps.storage, start, None, Order::Ascending)
 ```
+
 Notice that here we build a bound for an address, and using a raw bound allows us to skip address validation / build up.
 
 See storage-plus [README.md](./packages/storage-plus/README.md#Bound) for more information on `Bound`.
@@ -82,21 +84,23 @@ See storage-plus [README.md](./packages/storage-plus/README.md#Bound) for more i
 
 ### Breaking Issues / PRs
 
-- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
-  Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
+- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) / Signed int keys order
+  [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
 
 As part of range iterators revamping, we fixed the order of signed integer keys. You shouldn't change anything in your
-code base for this, but if you were using signed keys and relying on their ordering, that has now changed for the better.
-Take into account also that **the internal representation of signed integer keys has changed**. So, if you
-have data stored under signed integer keys you would need to **migrate it**, or recreate it under the new representation.
+code base for this, but if you were using signed keys and relying on their ordering, that has now changed for the
+better. Take into account also that **the internal representation of signed integer keys has changed**. So, if you have
+data stored under signed integer keys you would need to **migrate it**, or recreate it under the new representation.
 
 As part of this, a couple helpers for handling int keys serialization and deserialization were introduced:
+
 - `from_cw_bytes` Integer (signed and unsigned) values deserialization.
 - `to_cw_bytes` - Integer (signed and unsigned) values serialization.
 
 You shouldn't need these, except when manually handling raw integer keys serialization / deserialization.
 
 Migration code example:
+
 ```rust
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
@@ -163,7 +167,8 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, Contra
 
 ---
 
-- Rename cw0 to utils [\#471](https://github.com/CosmWasm/cw-plus/issues/471) / Cw0 rename [\#508](https://github.com/CosmWasm/cw-plus/pull/508)
+- Rename cw0 to utils [\#471](https://github.com/CosmWasm/cw-plus/issues/471) / Cw0 rename
+  [\#508](https://github.com/CosmWasm/cw-plus/pull/508)
 
 The `cw0` package was renamed to `cw-utils`. The required changes are straightforward:
 
@@ -187,13 +192,14 @@ index b4852225..f20a65ec 100644
 
 ---
 
-- Deprecate `range` to `range_raw` [\#460](https://github.com/CosmWasm/cw-plus/issues/460) /
-`range` to `range raw` [\#576](https://github.com/CosmWasm/cw-plus/pull/576).
+- Deprecate `range` to `range_raw` [\#460](https://github.com/CosmWasm/cw-plus/issues/460) / `range` to `range raw`
+  [\#576](https://github.com/CosmWasm/cw-plus/pull/576).
 
-`range` was renamed to `range_raw` (no key deserialization), and `range_de` to `range`. This means you can now count
-on the key to be deserialized for you, which results in cleaner / simpler code.
+`range` was renamed to `range_raw` (no key deserialization), and `range_de` to `range`. This means you can now count on
+the key to be deserialized for you, which results in cleaner / simpler code.
 
 There are some examples in the contracts code base, by example:
+
 ```diff
 diff --git a/contracts/cw3-fixed-multisig/src/contract.rs b/contracts/cw3-fixed-multisig/src/contract.rs
 index 48a60083..2f2ef70d 100644
@@ -215,15 +221,16 @@ index 48a60083..2f2ef70d 100644
 
 If you don't need key deserialization, just can just rename `range` to `range_raw` and you are good to go.
 
-If you want key deserialization for **indexes**, you need to specify the primary key type as a last (optional)
-argument in the index key specification. If not specified, it defaults to `()`, which means that primary keys will
-not only not be deserialized, but also not provided. This is for backwards-compatibility with current indexes
-specifications, and may change in the future once these features are stabilized.
-See `packages/storage-plus/src/indexed_map.rs` tests for reference.
+If you want key deserialization for **indexes**, you need to specify the primary key type as a last (optional) argument
+in the index key specification. If not specified, it defaults to `()`, which means that primary keys will not only not
+be deserialized, but also not provided. This is for backwards-compatibility with current indexes specifications, and may
+change in the future once these features are stabilized. See `packages/storage-plus/src/indexed_map.rs` tests for
+reference.
 
 ---
 
 Renamed methods:
+
 - `range` -> `range_raw`
 - `keys` -> `keys_raw`
 - `prefix_range` -> `prefix_range_raw`
@@ -235,14 +242,15 @@ Finally, this applies to all the `Map`-like types, including indexed maps.
 
 ---
 
-- `UniqueIndex` / `MultiIndex` key consistency [\#532](https://github.com/CosmWasm/cw-plus/issues/532) /
-Index keys consistency [\#568](https://github.com/CosmWasm/cw-plus/pull/568)
+- `UniqueIndex` / `MultiIndex` key consistency [\#532](https://github.com/CosmWasm/cw-plus/issues/532) / Index keys
+  consistency [\#568](https://github.com/CosmWasm/cw-plus/pull/568)
 
-For both `UniqueIndex` and `MultiIndex`, returned keys (deserialized or not) are now the associated *primary keys* of
+For both `UniqueIndex` and `MultiIndex`, returned keys (deserialized or not) are now the associated _primary keys_ of
 the data. This is a breaking change for `MultiIndex`, as the previous version returned a composite of the index key and
 the primary key.
 
 Examples of required changes are:
+
 ```diff
 diff --git a/packages/storage-plus/src/indexed_map.rs b/packages/storage-plus/src/indexed_map.rs
 index 9f7178af..d11d501e 100644
@@ -299,13 +307,14 @@ index 9f7178af..d11d501e 100644
 
 ---
 
-- Remove the primary key from the `MultiIndex` key specification [\#533](https://github.com/CosmWasm/cw-plus/issues/533) /
-`MultiIndex` primary key spec removal [\#569](https://github.com/CosmWasm/cw-plus/pull/569)
+- Remove the primary key from the `MultiIndex` key specification [\#533](https://github.com/CosmWasm/cw-plus/issues/533)
+  / `MultiIndex` primary key spec removal [\#569](https://github.com/CosmWasm/cw-plus/pull/569)
 
-The primary key is no longer needed when specifying `MultiIndex` keys. This simplifies both `MultiIndex` definitions
-and usage.
+The primary key is no longer needed when specifying `MultiIndex` keys. This simplifies both `MultiIndex` definitions and
+usage.
 
 Required changes are along the lines of:
+
 ```diff
 diff --git a/packages/storage-plus/src/indexed_map.rs b/packages/storage-plus/src/indexed_map.rs
 index 022a4504..c7a3bb9d 100644
@@ -367,11 +376,12 @@ pub struct InstantiateMsg {
 
 ### Non-breaking Issues / PRs
 
-- Deprecate `IntKey` [\#472](https://github.com/CosmWasm/cw-plus/issues/472) /
-Deprecate IntKey [\#547](https://github.com/CosmWasm/cw-plus/pull/547)
+- Deprecate `IntKey` [\#472](https://github.com/CosmWasm/cw-plus/issues/472) / Deprecate IntKey
+  [\#547](https://github.com/CosmWasm/cw-plus/pull/547)
 
-The `IntKey` wrapper and its type aliases are marked as deprecated, and will be removed in the next major version.
-The migration is straightforward, just remove the wrappers:
+The `IntKey` wrapper and its type aliases are marked as deprecated, and will be removed in the next major version. The
+migration is straightforward, just remove the wrappers:
+
 ```diff
 diff --git a/contracts/cw20-merkle-airdrop/src/contract.rs b/contracts/cw20-merkle-airdrop/src/contract.rs
 index e8d5ea57..bdf555e8 100644
