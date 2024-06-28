@@ -1,37 +1,40 @@
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{from_json, Addr, Api, DepsMut, OwnedDeps, Querier, Storage, SubMsg};
-use cw4::{member_key, Member, MemberChangedHookMsg, MemberDiff, TOTAL_KEY};
-use cw_controllers::{AdminError, HookError};
-
 use crate::contract::{
     execute, instantiate, query_list_members, query_member, query_total_weight, update_members,
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{ADMIN, HOOKS};
 use crate::ContractError;
+use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env, MockApi};
+use cosmwasm_std::{from_json, Addr, Api, DepsMut, OwnedDeps, Querier, Storage, SubMsg};
+use cw4::{member_key, Member, MemberChangedHookMsg, MemberDiff, TOTAL_KEY};
+use cw_controllers::{AdminError, HookError};
+use once_cell::sync::Lazy;
 
-use easy_addr::addr;
+fn mock_api() -> MockApi {
+    mock_dependencies().api
+}
 
-const INIT_ADMIN: &str = addr!("juan");
-const USER1: &str = addr!("somebody");
-const USER2: &str = addr!("else");
-const USER3: &str = addr!("funny");
+static INIT_ADMIN: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("juan"));
+static USER1: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("somebody"));
+static USER2: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("else"));
+static USER3: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("funny"));
+static CREATOR: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("creator"));
 
 fn set_up(deps: DepsMut) {
     let msg = InstantiateMsg {
-        admin: Some(INIT_ADMIN.into()),
+        admin: Some(INIT_ADMIN.to_string()),
         members: vec![
             Member {
-                addr: USER1.into(),
+                addr: USER1.to_string(),
                 weight: 11,
             },
             Member {
-                addr: USER2.into(),
+                addr: USER2.to_string(),
                 weight: 6,
             },
         ],
     };
-    let info = mock_info("creator", &[]);
+    let info = message_info(&CREATOR, &[]);
     instantiate(deps, mock_env(), info, msg).unwrap();
 }
 
@@ -42,7 +45,7 @@ fn proper_instantiation() {
 
     // it worked, let's query the state
     let res = ADMIN.query_admin(deps.as_ref()).unwrap();
-    assert_eq!(Some(INIT_ADMIN.into()), res.admin);
+    assert_eq!(Some(INIT_ADMIN.to_string()), res.admin);
 
     let res = query_total_weight(deps.as_ref(), None).unwrap();
     assert_eq!(17, res.weight);
@@ -53,13 +56,13 @@ fn try_member_queries() {
     let mut deps = mock_dependencies();
     set_up(deps.as_mut());
 
-    let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
+    let member1 = query_member(deps.as_ref(), USER1.to_string(), None).unwrap();
     assert_eq!(member1.weight, Some(11));
 
-    let member2 = query_member(deps.as_ref(), USER2.into(), None).unwrap();
+    let member2 = query_member(deps.as_ref(), USER2.to_string(), None).unwrap();
     assert_eq!(member2.weight, Some(6));
 
-    let member3 = query_member(deps.as_ref(), USER3.into(), None).unwrap();
+    let member3 = query_member(deps.as_ref(), USER3.to_string(), None).unwrap();
     assert_eq!(member3.weight, None);
 
     let members = query_list_members(deps.as_ref(), None, None).unwrap();
@@ -72,23 +75,23 @@ fn duplicate_members_instantiation() {
     let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {
-        admin: Some(INIT_ADMIN.into()),
+        admin: Some(INIT_ADMIN.to_string()),
         members: vec![
             Member {
-                addr: USER1.into(),
+                addr: USER1.to_string(),
                 weight: 5,
             },
             Member {
-                addr: USER2.into(),
+                addr: USER2.to_string(),
                 weight: 6,
             },
             Member {
-                addr: USER1.into(),
+                addr: USER1.to_string(),
                 weight: 6,
             },
         ],
     };
-    let info = mock_info("creator", &[]);
+    let info = message_info(&CREATOR, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
     assert_eq!(
         err,
@@ -106,24 +109,18 @@ fn duplicate_members_execution() {
 
     let add = vec![
         Member {
-            addr: USER3.into(),
+            addr: USER3.to_string(),
             weight: 15,
         },
         Member {
-            addr: USER3.into(),
+            addr: USER3.to_string(),
             weight: 11,
         },
     ];
 
     let height = mock_env().block.height;
-    let err = update_members(
-        deps.as_mut(),
-        height + 5,
-        Addr::unchecked(INIT_ADMIN),
-        add,
-        vec![],
-    )
-    .unwrap_err();
+    let err =
+        update_members(deps.as_mut(), height + 5, INIT_ADMIN.clone(), add, vec![]).unwrap_err();
 
     assert_eq!(
         err,
@@ -140,13 +137,13 @@ fn assert_users<S: Storage, A: Api, Q: Querier>(
     user3_weight: Option<u64>,
     height: Option<u64>,
 ) {
-    let member1 = query_member(deps.as_ref(), USER1.into(), height).unwrap();
+    let member1 = query_member(deps.as_ref(), USER1.to_string(), height).unwrap();
     assert_eq!(member1.weight, user1_weight);
 
-    let member2 = query_member(deps.as_ref(), USER2.into(), height).unwrap();
+    let member2 = query_member(deps.as_ref(), USER2.to_string(), height).unwrap();
     assert_eq!(member2.weight, user2_weight);
 
-    let member3 = query_member(deps.as_ref(), USER3.into(), height).unwrap();
+    let member3 = query_member(deps.as_ref(), USER3.to_string(), height).unwrap();
     assert_eq!(member3.weight, user3_weight);
 
     // this is only valid if we are not doing a historical query
@@ -172,17 +169,17 @@ fn add_new_remove_old_member() {
 
     // add a new one and remove existing one
     let add = vec![Member {
-        addr: USER3.into(),
+        addr: USER3.to_string(),
         weight: 15,
     }];
-    let remove = vec![USER1.into()];
+    let remove = vec![USER1.to_string()];
 
     // non-admin cannot update
     let height = mock_env().block.height;
     let err = update_members(
         deps.as_mut(),
         height + 5,
-        Addr::unchecked(USER1),
+        USER1.clone(),
         add.clone(),
         remove.clone(),
     )
@@ -197,14 +194,7 @@ fn add_new_remove_old_member() {
     assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
 
     // admin updates properly
-    update_members(
-        deps.as_mut(),
-        height + 10,
-        Addr::unchecked(INIT_ADMIN),
-        add,
-        remove,
-    )
-    .unwrap();
+    update_members(deps.as_mut(), height + 10, INIT_ADMIN.clone(), add, remove).unwrap();
 
     // updated properly
     assert_users(&deps, None, Some(6), Some(15), None);
@@ -221,21 +211,14 @@ fn add_old_remove_new_member() {
 
     // add a new one and remove existing one
     let add = vec![Member {
-        addr: USER1.into(),
+        addr: USER1.to_string(),
         weight: 4,
     }];
-    let remove = vec![USER3.into()];
+    let remove = vec![USER3.to_string()];
 
     // admin updates properly
     let height = mock_env().block.height;
-    update_members(
-        deps.as_mut(),
-        height,
-        Addr::unchecked(INIT_ADMIN),
-        add,
-        remove,
-    )
-    .unwrap();
+    update_members(deps.as_mut(), height, INIT_ADMIN.clone(), add, remove).unwrap();
     assert_users(&deps, Some(4), Some(6), None, None);
 }
 
@@ -248,26 +231,19 @@ fn add_and_remove_same_member() {
     // USER1 is updated and remove in the same call, we should remove this an add member3
     let add = vec![
         Member {
-            addr: USER1.into(),
+            addr: USER1.to_string(),
             weight: 20,
         },
         Member {
-            addr: USER3.into(),
+            addr: USER3.to_string(),
             weight: 5,
         },
     ];
-    let remove = vec![USER1.into()];
+    let remove = vec![USER1.to_string()];
 
     // admin updates properly
     let height = mock_env().block.height;
-    update_members(
-        deps.as_mut(),
-        height,
-        Addr::unchecked(INIT_ADMIN),
-        add,
-        remove,
-    )
-    .unwrap();
+    update_members(deps.as_mut(), height, INIT_ADMIN.clone(), add, remove).unwrap();
     assert_users(&deps, None, Some(6), Some(5), None);
 }
 
@@ -288,7 +264,7 @@ fn add_remove_hooks() {
     };
 
     // non-admin cannot add hook
-    let user_info = mock_info(USER1, &[]);
+    let user_info = message_info(&USER1, &[]);
     let err = execute(
         deps.as_mut(),
         mock_env(),
@@ -299,7 +275,7 @@ fn add_remove_hooks() {
     assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
     // admin can add it, and it appears in the query
-    let admin_info = mock_info(INIT_ADMIN, &[]);
+    let admin_info = message_info(&INIT_ADMIN, &[]);
     let _ = execute(
         deps.as_mut(),
         mock_env(),
@@ -352,7 +328,7 @@ fn hooks_fire() {
     let contract2 = deps.api.addr_make("hook2").to_string();
 
     // register 2 hooks
-    let admin_info = mock_info(INIT_ADMIN, &[]);
+    let admin_info = message_info(&INIT_ADMIN, &[]);
     let add_msg = ExecuteMsg::AddHook {
         addr: contract1.clone(),
     };
@@ -367,15 +343,15 @@ fn hooks_fire() {
     // USER1 is updated and remove in the same call, we should remove this an add member3
     let add = vec![
         Member {
-            addr: USER1.into(),
+            addr: USER1.to_string(),
             weight: 20,
         },
         Member {
-            addr: USER3.into(),
+            addr: USER3.to_string(),
             weight: 5,
         },
     ];
-    let remove = vec![USER2.into()];
+    let remove = vec![USER2.to_string()];
     let msg = ExecuteMsg::UpdateMembers { remove, add };
 
     // admin updates properly
@@ -388,9 +364,9 @@ fn hooks_fire() {
     // same order as in the message (adds first, then remove)
     // order of added users is not guaranteed to be preserved
     let diffs = vec![
-        MemberDiff::new(USER3, None, Some(5)),
-        MemberDiff::new(USER1, Some(11), Some(20)),
-        MemberDiff::new(USER2, Some(6), None),
+        MemberDiff::new(USER3.to_string(), None, Some(5)),
+        MemberDiff::new(USER1.to_string(), Some(11), Some(20)),
+        MemberDiff::new(USER2.to_string(), Some(6), None),
     ];
     let hook_msg = MemberChangedHookMsg { diffs };
     let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1).unwrap());
@@ -413,12 +389,12 @@ fn raw_queries_work() {
     assert_eq!(17, total);
 
     // get member votes from raw key
-    let member2_raw = deps.storage.get(&member_key(USER2)).unwrap();
+    let member2_raw = deps.storage.get(&member_key(USER2.as_str())).unwrap();
     let member2: u64 = from_json(member2_raw).unwrap();
     assert_eq!(6, member2);
 
     // and execute misses
-    let member3_raw = deps.storage.get(&member_key(USER3));
+    let member3_raw = deps.storage.get(&member_key(USER3.as_str()));
     assert_eq!(None, member3_raw);
 }
 

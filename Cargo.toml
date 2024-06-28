@@ -5,33 +5,29 @@ members = ["packages/*", "contracts/*"]
 resolver = "2"
 
 [workspace.package]
-version = "2.0.0"
+version = "2.0.1"
 
 [workspace.dependencies]
-cosmwasm-schema = "2.0.2"
-cosmwasm-std = "2.0.2"
+cosmwasm-schema = "2.0.4"
+cosmwasm-std = "2.0.4"
 cw2 = "2.0.0"
 cw-controllers = "2.0.0"
-cw-multi-test = "2.0.0"
+cw-multi-test = "2.1.0-rc.1"
 cw-storage-plus = "2.0.0"
 cw-utils = "2.0.0"
-schemars = "0.8.15"
+schemars = "0.8.21"
 semver = "1"
-serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-thiserror = "1.0.4"
+serde = { version = "1.0.203", default-features = false, features = ["derive"] }
+thiserror = "1.0.61"
 
-cw1 = { path = "packages/cw1", version = "2.0.0-rc.0" }
-cw1-whitelist = { path = "contracts/cw1-whitelist", version = "2.0.0-rc.0", features = [
-    "library",
-] }
-cw20 = { path = "packages/cw20", version = "2.0.0-rc.0" }
-cw20-base = { path = "contracts/cw20-base", version = "2.0.0-rc.0", features = ["library"] }
-cw3 = { path = "packages/cw3", version = "2.0.0-rc.0" }
-cw3-fixed-multisig = { path = "contracts/cw3-fixed-multisig", version = "2.0.0-rc.0", features = [
-    "library",
-] }
-cw4 = { path = "packages/cw4", version = "2.0.0-rc.0" }
-cw4-group = { path = "contracts/cw4-group", version = "2.0.0-rc.0" }
+cw1 = { path = "packages/cw1", version = "2.0.0" }
+cw1-whitelist = { path = "contracts/cw1-whitelist", version = "2.0.0", features = ["library"] }
+cw20 = { path = "packages/cw20", version = "2.0.0" }
+cw20-base = { path = "contracts/cw20-base", version = "2.0.0", features = ["library"] }
+cw3 = { path = "packages/cw3", version = "2.0.0" }
+cw3-fixed-multisig = { path = "contracts/cw3-fixed-multisig", version = "2.0.0", features = ["library"] }
+cw4 = { path = "packages/cw4", version = "2.0.0" }
+cw4-group = { path = "contracts/cw4-group", version = "2.0.0" }
 easy-addr = { path = "packages/easy-addr" }
 
 [profile.release.package.cw1-subkeys]

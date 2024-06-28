@@ -255,7 +255,7 @@ where
                 allowance.expires = exp;
             }
 
-            allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
+            allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflow (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
             Ok(allowance)
         })?;
 
@@ -470,32 +470,29 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, Contra
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::state::Permissions;
     use cosmwasm_std::testing::{
-        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+        message_info, mock_dependencies, mock_env, MockApi, MockQuerier, MockStorage,
     };
-    use cosmwasm_std::{coin, coins, OwnedDeps, StakingMsg, SubMsg, Timestamp};
-
+    use cosmwasm_std::{coin, coins, Addr, OwnedDeps, StakingMsg, SubMsg, Timestamp};
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
     use cw_utils::NativeBalance;
-
-    use easy_addr::addr;
-
-    use crate::state::Permissions;
-
+    use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
-    use super::*;
+    fn mock_api() -> MockApi {
+        mock_dependencies().api
+    }
 
-    const OWNER: &str = addr!("owner");
-
-    const ADMIN1: &str = addr!("admin1");
-    const ADMIN2: &str = addr!("admin2");
-
-    const SPENDER1: &str = addr!("spender1");
-    const SPENDER2: &str = addr!("spender2");
-    const SPENDER3: &str = addr!("spender3");
-    const SPENDER4: &str = addr!("spender4");
+    static ADMIN1: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("admin1"));
+    static OWNER: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("owner"));
+    static ADMIN2: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("admin2"));
+    static SPENDER1: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("spender1"));
+    static SPENDER2: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("spender2"));
+    static SPENDER3: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("spender3"));
+    static SPENDER4: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("spender4"));
 
     const TOKEN: &str = "token";
     const TOKEN1: &str = "token1";
@@ -525,8 +522,8 @@ mod tests {
     /// Helper structure for Suite configuration
     #[derive(Default)]
     struct SuiteConfig {
-        spenders: HashMap<&'static str, Spender>,
-        admins: Vec<&'static str>,
+        spenders: HashMap<Addr, Spender>,
+        admins: Vec<Addr>,
     }
 
     impl SuiteConfig {
@@ -538,17 +535,17 @@ mod tests {
             Suite::init_with_config(self)
         }
 
-        fn with_allowance(mut self, spender: &'static str, allowance: Coin) -> Self {
+        fn with_allowance(mut self, spender: &Addr, allowance: Coin) -> Self {
             self.spenders
-                .entry(spender)
+                .entry(spender.clone())
                 .or_default()
                 .allowances
                 .push(allowance);
             self
         }
 
-        fn expire_allowances(mut self, spender: &'static str, expires: Expiration) -> Self {
-            let item = self.spenders.entry(spender).or_default();
+        fn expire_allowances(mut self, spender: &Addr, expires: Expiration) -> Self {
+            let item = self.spenders.entry(spender.clone()).or_default();
             assert!(
                 item.allowances_expire.is_none(),
                 "Allowances expiration for spender {spender} already configured",
@@ -557,8 +554,8 @@ mod tests {
             self
         }
 
-        fn with_permissions(mut self, spender: &'static str, permissions: Permissions) -> Self {
-            let item = self.spenders.entry(spender).or_default();
+        fn with_permissions(mut self, spender: &Addr, permissions: Permissions) -> Self {
+            let item = self.spenders.entry(spender.clone()).or_default();
             assert!(
                 item.permissions.is_none(),
                 "Permissions for spender {spender} already configured",
@@ -567,8 +564,8 @@ mod tests {
             self
         }
 
-        fn with_admin(mut self, admin: &'static str) -> Self {
-            self.admins.push(admin);
+        fn with_admin(mut self, admin: &Addr) -> Self {
+            self.admins.push(admin.clone());
             self
         }
     }
@@ -595,16 +592,16 @@ mod tests {
         /// Initialized test case using provided config
         fn init_with_config(config: SuiteConfig) -> Self {
             let mut deps = mock_dependencies();
-            let admins = std::iter::once(OWNER)
+            let admins = std::iter::once(OWNER.clone())
                 .chain(config.admins)
-                .map(ToOwned::to_owned)
+                .map(|addr| addr.to_string())
                 .collect();
 
             let instantiate_msg = InstantiateMsg {
                 admins,
                 mutable: true,
             };
-            let owner = mock_info(OWNER, &[]);
+            let owner = message_info(&OWNER, &[]);
 
             instantiate(
                 deps.as_mut().branch(),
@@ -623,12 +620,12 @@ mod tests {
 
                 for amount in allowances {
                     let msg = ExecuteMsg::IncreaseAllowance {
-                        spender: name.to_owned(),
+                        spender: name.to_string(),
                         amount,
                         expires,
                     };
 
-                    // Extend block and time, so all alowances are set, even if expired in normal
+                    // Extend block and time, so all allowances are set, even if expired in normal
                     // mock_env
                     let mut env = mock_env();
                     env.block.time = Timestamp::from_nanos(0);
@@ -638,7 +635,7 @@ mod tests {
 
                 if let Some(permissions) = permissions {
                     let msg = ExecuteMsg::SetPermissions {
-                        spender: name.to_owned(),
+                        spender: name.to_string(),
                         permissions,
                     };
                     execute(deps.as_mut().branch(), mock_env(), owner.clone(), msg).unwrap();
@@ -651,7 +648,7 @@ mod tests {
 
     /// Helper function for comparing vectors or another slice-like object as they would represent
     /// set with duplications. Compares sets by first sorting elements using provided ordering.
-    /// This functions reshufless elements inplace, as it should never matter as compared
+    /// This functions reshuffles elements inplace, as it should never matter as compared
     /// containers should represent same value regardless of ordering, and making this inplace just
     /// safes obsolete copying.
     ///
@@ -688,13 +685,13 @@ mod tests {
         #[test]
         fn query() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN))
-                .with_allowance(SPENDER2, coin(2, TOKEN))
+                .with_allowance(&SPENDER1, coin(1, TOKEN))
+                .with_allowance(&SPENDER2, coin(2, TOKEN))
                 .init();
 
             // Check allowances work for accounts with balances
             let allowance =
-                query_allowance(deps.as_ref(), mock_env(), SPENDER1.to_owned()).unwrap();
+                query_allowance(deps.as_ref(), mock_env(), SPENDER1.to_string()).unwrap();
             assert_eq!(
                 allowance,
                 Allowance {
@@ -703,7 +700,7 @@ mod tests {
                 }
             );
             let allowance =
-                query_allowance(deps.as_ref(), mock_env(), SPENDER2.to_owned()).unwrap();
+                query_allowance(deps.as_ref(), mock_env(), SPENDER2.to_string()).unwrap();
             assert_eq!(
                 allowance,
                 Allowance {
@@ -721,13 +718,13 @@ mod tests {
         #[test]
         fn query_expired() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN))
-                .expire_allowances(SPENDER1, EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(1, TOKEN))
+                .expire_allowances(&SPENDER1, EXPIRED_HEIGHT)
                 .init();
 
             // Check allowances work for accounts with balances
             let allowance =
-                query_allowance(deps.as_ref(), mock_env(), SPENDER1.to_owned()).unwrap();
+                query_allowance(deps.as_ref(), mock_env(), SPENDER1.to_string()).unwrap();
             assert_eq!(
                 allowance,
                 Allowance {
@@ -747,14 +744,14 @@ mod tests {
             let s3_expire = NON_EXPIRED_HEIGHT;
 
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, s1_allow.clone())
-                .with_allowance(SPENDER2, s2_allow.clone())
-                .expire_allowances(SPENDER2, s2_expire)
-                .with_allowance(SPENDER3, s3_allow.clone())
-                .expire_allowances(SPENDER3, s3_expire)
+                .with_allowance(&SPENDER1, s1_allow.clone())
+                .with_allowance(&SPENDER2, s2_allow.clone())
+                .expire_allowances(&SPENDER2, s2_expire)
+                .with_allowance(&SPENDER3, s3_allow.clone())
+                .expire_allowances(&SPENDER3, s3_expire)
                 // This allowance is already expired - should not occur in result
-                .with_allowance(SPENDER4, coin(2222, TOKEN))
-                .expire_allowances(SPENDER4, EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER4, coin(2222, TOKEN))
+                .expire_allowances(&SPENDER4, EXPIRED_HEIGHT)
                 .init();
 
             // let's try pagination.
@@ -781,17 +778,17 @@ mod tests {
 
             let expected = vec![
                 AllowanceInfo {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     balance: NativeBalance(vec![s1_allow]),
                     expires: Expiration::Never {}, // Not set, expected default
                 },
                 AllowanceInfo {
-                    spender: SPENDER2.to_owned(),
+                    spender: SPENDER2.to_string(),
                     balance: NativeBalance(vec![s2_allow]),
                     expires: s2_expire,
                 },
                 AllowanceInfo {
-                    spender: SPENDER3.to_owned(),
+                    spender: SPENDER3.to_string(),
                     balance: NativeBalance(vec![s3_allow]),
                     expires: s3_expire,
                 },
@@ -811,8 +808,8 @@ mod tests {
         #[test]
         fn query() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_permissions(SPENDER1, ALL_PERMS)
-                .with_permissions(SPENDER2, NO_PERMS)
+                .with_permissions(&SPENDER1, ALL_PERMS)
+                .with_permissions(&SPENDER2, NO_PERMS)
                 .init();
 
             let permissions = query_permissions(deps.as_ref(), SPENDER1.to_string()).unwrap();
@@ -829,9 +826,9 @@ mod tests {
         #[test]
         fn query_all() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_permissions(SPENDER1, ALL_PERMS)
-                .with_permissions(SPENDER2, NO_PERMS)
-                .with_permissions(SPENDER3, NO_PERMS)
+                .with_permissions(&SPENDER1, ALL_PERMS)
+                .with_permissions(&SPENDER2, NO_PERMS)
+                .with_permissions(&SPENDER3, NO_PERMS)
                 .init();
 
             // let's try pagination
@@ -848,15 +845,15 @@ mod tests {
 
             let expected = vec![
                 PermissionsInfo {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     permissions: ALL_PERMS,
                 },
                 PermissionsInfo {
-                    spender: SPENDER2.to_owned(),
+                    spender: SPENDER2.to_string(),
                     permissions: NO_PERMS,
                 },
                 PermissionsInfo {
-                    spender: SPENDER3.to_owned(),
+                    spender: SPENDER3.to_string(),
                     permissions: NO_PERMS,
                 },
             ];
@@ -874,13 +871,13 @@ mod tests {
 
         #[test]
         fn query() {
-            let Suite { deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+            let Suite { deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
 
             // Verify
             assert_eq!(
                 query_admin_list(deps.as_ref()).unwrap().canonical(),
                 AdminListResponse {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string()],
                     mutable: true,
                 }
                 .canonical()
@@ -898,7 +895,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::UpdateAdmins {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned(), ADMIN2.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string(), ADMIN2.to_string()],
                 },
             )
             .unwrap();
@@ -910,7 +907,7 @@ mod tests {
             assert_eq!(
                 query_admin_list(deps.as_ref()).unwrap().canonical(),
                 AdminListResponse {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned(), ADMIN2.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string(), ADMIN2.to_string()],
                     mutable: true,
                 }
                 .canonical()
@@ -919,15 +916,15 @@ mod tests {
 
         #[test]
         fn non_owner_update() {
-            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
-            let info = mock_info(ADMIN1, &[]);
+            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
+            let info = message_info(&ADMIN1, &[]);
 
             let rsp = execute(
                 deps.as_mut(),
                 mock_env(),
                 info,
                 ExecuteMsg::UpdateAdmins {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned(), ADMIN2.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string(), ADMIN2.to_string()],
                 },
             )
             .unwrap();
@@ -939,7 +936,7 @@ mod tests {
             assert_eq!(
                 query_admin_list(deps.as_ref()).unwrap().canonical(),
                 AdminListResponse {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned(), ADMIN2.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string(), ADMIN2.to_string()],
                     mutable: true,
                 }
                 .canonical()
@@ -949,14 +946,14 @@ mod tests {
         #[test]
         fn non_admin_fail_to_update() {
             let Suite { mut deps, .. } = SuiteConfig::new().init();
-            let info = mock_info(ADMIN1, &[]);
+            let info = message_info(&ADMIN1, &[]);
 
             execute(
                 deps.as_mut(),
                 mock_env(),
                 info,
                 ExecuteMsg::UpdateAdmins {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned(), ADMIN2.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string(), ADMIN2.to_string()],
                 },
             )
             .unwrap_err();
@@ -964,7 +961,7 @@ mod tests {
             assert_eq!(
                 query_admin_list(deps.as_ref()).unwrap().canonical(),
                 AdminListResponse {
-                    admins: vec![OWNER.to_owned()],
+                    admins: vec![OWNER.to_string()],
                     mutable: true,
                 }
                 .canonical()
@@ -983,7 +980,7 @@ mod tests {
                 mock_env(),
                 owner.clone(),
                 ExecuteMsg::UpdateAdmins {
-                    admins: vec![ADMIN1.to_owned()],
+                    admins: vec![ADMIN1.to_string()],
                 },
             )
             .unwrap();
@@ -993,7 +990,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::UpdateAdmins {
-                    admins: vec![OWNER.to_owned(), ADMIN1.to_owned(), ADMIN2.to_owned()],
+                    admins: vec![OWNER.to_string(), ADMIN1.to_string(), ADMIN2.to_string()],
                 },
             )
             .unwrap_err();
@@ -1001,7 +998,7 @@ mod tests {
             assert_eq!(
                 query_admin_list(deps.as_ref()).unwrap().canonical(),
                 AdminListResponse {
-                    admins: vec![ADMIN1.to_owned()],
+                    admins: vec![ADMIN1.to_string()],
                     mutable: true,
                 }
                 .canonical()
@@ -1020,7 +1017,7 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
                 .init();
 
             let rsp = execute(
@@ -1028,7 +1025,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(3, TOKEN1),
                     expires: None,
                 },
@@ -1045,7 +1042,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(4, TOKEN1)]),
                         expires: Expiration::Never {},
                     }]
@@ -1059,7 +1056,7 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
                 .init();
 
             let mut env = mock_env();
@@ -1070,7 +1067,7 @@ mod tests {
                 env,
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(3, TOKEN1),
                     expires: Some(NON_EXPIRED_HEIGHT),
                 },
@@ -1087,7 +1084,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(4, TOKEN1)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1101,7 +1098,7 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
                 .init();
 
             let rsp = execute(
@@ -1109,7 +1106,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(3, TOKEN2),
                     expires: None,
                 },
@@ -1126,7 +1123,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(1, TOKEN1), coin(3, TOKEN2)]),
                         expires: Expiration::Never {},
                     }]
@@ -1140,7 +1137,7 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
                 .init();
 
             let rsp = execute(
@@ -1148,7 +1145,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER2.to_owned(),
+                    spender: SPENDER2.to_string(),
                     amount: coin(3, TOKEN1),
                     expires: None,
                 },
@@ -1166,12 +1163,12 @@ mod tests {
                 AllAllowancesResponse {
                     allowances: vec![
                         AllowanceInfo {
-                            spender: SPENDER1.to_owned(),
+                            spender: SPENDER1.to_string(),
                             balance: NativeBalance(vec![coin(1, TOKEN1)]),
                             expires: Expiration::Never {},
                         },
                         AllowanceInfo {
-                            spender: SPENDER2.to_owned(),
+                            spender: SPENDER2.to_string(),
                             balance: NativeBalance(vec![coin(3, TOKEN1)]),
                             expires: Expiration::Never {},
                         }
@@ -1186,7 +1183,7 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
                 .init();
 
             let rsp = execute(
@@ -1194,7 +1191,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER2.to_owned(),
+                    spender: SPENDER2.to_string(),
                     amount: coin(3, TOKEN1),
                     expires: Some(NON_EXPIRED_HEIGHT),
                 },
@@ -1212,12 +1209,12 @@ mod tests {
                 AllAllowancesResponse {
                     allowances: vec![
                         AllowanceInfo {
-                            spender: SPENDER1.to_owned(),
+                            spender: SPENDER1.to_string(),
                             balance: NativeBalance(vec![coin(1, TOKEN1)]),
                             expires: Expiration::Never {},
                         },
                         AllowanceInfo {
-                            spender: SPENDER2.to_owned(),
+                            spender: SPENDER2.to_string(),
                             balance: NativeBalance(vec![coin(3, TOKEN1)]),
                             expires: NON_EXPIRED_HEIGHT,
                         }
@@ -1232,8 +1229,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
-                .expire_allowances(SPENDER1, EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
+                .expire_allowances(&SPENDER1, EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1241,7 +1238,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(2, TOKEN2),
                     expires: Some(NON_EXPIRED_TIME),
                 },
@@ -1258,7 +1255,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(2, TOKEN2)]),
                         expires: NON_EXPIRED_TIME,
                     }]
@@ -1272,8 +1269,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1281,7 +1278,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(2, TOKEN2),
                     expires: Some(EXPIRED_TIME),
                 },
@@ -1297,7 +1294,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(1, TOKEN1)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1311,8 +1308,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(1, TOKEN1))
-                .expire_allowances(SPENDER1, EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(1, TOKEN1))
+                .expire_allowances(&SPENDER1, EXPIRED_HEIGHT)
                 .init();
 
             execute(
@@ -1320,7 +1317,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(2, TOKEN2),
                     expires: None,
                 },
@@ -1347,8 +1344,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1356,7 +1353,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(4, TOKEN1),
                     expires: None,
                 },
@@ -1373,7 +1370,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(6, TOKEN1)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1387,9 +1384,9 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .with_allowance(SPENDER1, coin(20, TOKEN2))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .with_allowance(&SPENDER1, coin(20, TOKEN2))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1397,7 +1394,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(10, TOKEN1),
                     expires: None,
                 },
@@ -1414,7 +1411,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(20, TOKEN2)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1428,9 +1425,9 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .with_allowance(SPENDER1, coin(20, TOKEN2))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .with_allowance(&SPENDER1, coin(20, TOKEN2))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1438,7 +1435,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(15, TOKEN1),
                     expires: None,
                 },
@@ -1455,7 +1452,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(20, TOKEN2)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1469,8 +1466,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1478,7 +1475,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(10, TOKEN1),
                     expires: None,
                 },
@@ -1502,8 +1499,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             let rsp = execute(
@@ -1511,7 +1508,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(4, TOKEN1),
                     expires: Some(NON_EXPIRED_TIME),
                 },
@@ -1528,7 +1525,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(6, TOKEN1)]),
                         expires: NON_EXPIRED_TIME,
                     }]
@@ -1538,12 +1535,12 @@ mod tests {
         }
 
         #[test]
-        fn non_exisiting_token() {
+        fn non_existing_token() {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             execute(
@@ -1551,7 +1548,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(4, TOKEN2),
                     expires: None,
                 },
@@ -1564,7 +1561,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(10, TOKEN1)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1574,11 +1571,11 @@ mod tests {
         }
 
         #[test]
-        fn non_exisiting_spender() {
+        fn non_existing_spender() {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
                 .init();
 
             execute(
@@ -1586,7 +1583,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER2.to_owned(),
+                    spender: SPENDER2.to_string(),
                     amount: coin(4, TOKEN1),
                     expires: None,
                 },
@@ -1599,7 +1596,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(10, TOKEN1)]),
                         expires: Expiration::Never {},
                     }]
@@ -1613,8 +1610,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(3, TOKEN1))
-                .expire_allowances(SPENDER1, EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(3, TOKEN1))
+                .expire_allowances(&SPENDER1, EXPIRED_HEIGHT)
                 .init();
 
             execute(
@@ -1622,7 +1619,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::DecreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(2, TOKEN1),
                     expires: Some(NON_EXPIRED_TIME),
                 },
@@ -1642,8 +1639,8 @@ mod tests {
             let Suite {
                 mut deps, owner, ..
             } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(3, TOKEN1))
-                .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(3, TOKEN1))
+                .expire_allowances(&SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
             execute(
@@ -1651,7 +1648,7 @@ mod tests {
                 mock_env(),
                 owner,
                 ExecuteMsg::IncreaseAllowance {
-                    spender: SPENDER1.to_owned(),
+                    spender: SPENDER1.to_string(),
                     amount: coin(2, TOKEN1),
                     expires: Some(EXPIRED_TIME),
                 },
@@ -1664,7 +1661,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(3, TOKEN1)]),
                         expires: NON_EXPIRED_HEIGHT,
                     }]
@@ -1680,16 +1677,16 @@ mod tests {
         #[test]
         fn with_allowance() {
             let Suite { mut deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
                 .init();
 
             let msgs = vec![BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(6, TOKEN1),
             }
             .into()];
 
-            let info = mock_info(SPENDER1, &[]);
+            let info = message_info(&SPENDER1, &[]);
 
             let rsp = execute(
                 deps.as_mut(),
@@ -1712,7 +1709,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(vec![coin(4, TOKEN1)]),
                         expires: Expiration::Never {},
                     }]
@@ -1726,12 +1723,12 @@ mod tests {
             let Suite { mut deps, .. } = Suite::init();
 
             let msgs = vec![BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(6, TOKEN1),
             }
             .into()];
 
-            let info = mock_info(SPENDER1, &[]);
+            let info = message_info(&SPENDER1, &[]);
 
             execute(
                 deps.as_mut(),
@@ -1752,16 +1749,16 @@ mod tests {
         #[test]
         fn not_enough_allowance() {
             let Suite { mut deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
                 .init();
 
             let msgs = vec![BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(20, TOKEN1),
             }
             .into()];
 
-            let info = mock_info(SPENDER1, &[]);
+            let info = message_info(&SPENDER1, &[]);
 
             execute(
                 deps.as_mut(),
@@ -1777,7 +1774,7 @@ mod tests {
                     .canonical(),
                 AllAllowancesResponse {
                     allowances: vec![AllowanceInfo {
-                        spender: SPENDER1.to_owned(),
+                        spender: SPENDER1.to_string(),
                         balance: NativeBalance(coins(10, TOKEN1)),
                         expires: Expiration::Never {}
                     }]
@@ -1789,17 +1786,17 @@ mod tests {
         #[test]
         fn time_allowance_expired() {
             let Suite { mut deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, EXPIRED_TIME)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, EXPIRED_TIME)
                 .init();
 
             let msgs = vec![BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(6, TOKEN1),
             }
             .into()];
 
-            let info = mock_info(SPENDER1, &[]);
+            let info = message_info(&SPENDER1, &[]);
             execute(
                 deps.as_mut(),
                 mock_env(),
@@ -1819,17 +1816,17 @@ mod tests {
         #[test]
         fn height_allowance_expired() {
             let Suite { mut deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, EXPIRED_HEIGHT)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, EXPIRED_HEIGHT)
                 .init();
 
             let msgs = vec![BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(6, TOKEN1),
             }
             .into()];
 
-            let info = mock_info(SPENDER1, &[]);
+            let info = message_info(&SPENDER1, &[]);
             execute(
                 deps.as_mut(),
                 mock_env(),
@@ -1848,15 +1845,15 @@ mod tests {
 
         #[test]
         fn admin_without_allowance() {
-            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
 
             let msgs = vec![BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(20, TOKEN1),
             }
             .into()];
 
-            let info = mock_info(ADMIN1, &[]);
+            let info = message_info(&ADMIN1, &[]);
 
             let rsp = execute(
                 deps.as_mut(),
@@ -1887,9 +1884,9 @@ mod tests {
 
         #[test]
         fn admin() {
-            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
 
-            let info = mock_info(ADMIN1, &[]);
+            let info = message_info(&ADMIN1, &[]);
 
             let msgs = vec![CosmosMsg::Custom(Empty {})];
 
@@ -1911,9 +1908,9 @@ mod tests {
 
         #[test]
         fn non_admin() {
-            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
 
-            let info = mock_info(SPENDER1, &[]);
+            let info = message_info(&SPENDER1, &[]);
 
             let msgs = vec![CosmosMsg::Custom(Empty {})];
 
@@ -1933,7 +1930,7 @@ mod tests {
         #[test]
         fn allowed() {
             let Suite { mut deps, .. } = SuiteConfig::new()
-                .with_permissions(SPENDER1, ALL_PERMS)
+                .with_permissions(&SPENDER1, ALL_PERMS)
                 .init();
 
             let msgs = vec![
@@ -1964,7 +1961,7 @@ mod tests {
                 let rsp = execute(
                     deps.as_mut(),
                     mock_env(),
-                    mock_info(SPENDER1, &[]),
+                    message_info(&SPENDER1, &[]),
                     ExecuteMsg::Execute { msgs: msgs.clone() },
                 )
                 .unwrap();
@@ -1980,7 +1977,7 @@ mod tests {
 
         #[test]
         fn admin() {
-            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
 
             let msgs = vec![
                 StakingMsg::Delegate {
@@ -2010,7 +2007,7 @@ mod tests {
                 let rsp = execute(
                     deps.as_mut(),
                     mock_env(),
-                    mock_info(ADMIN1, &[]),
+                    message_info(&ADMIN1, &[]),
                     ExecuteMsg::Execute { msgs: msgs.clone() },
                 )
                 .unwrap();
@@ -2056,7 +2053,7 @@ mod tests {
                 execute(
                     deps.as_mut(),
                     mock_env(),
-                    mock_info(SPENDER1, &[]),
+                    message_info(&SPENDER1, &[]),
                     ExecuteMsg::Execute { msgs },
                 )
                 .unwrap_err();
@@ -2070,30 +2067,30 @@ mod tests {
         #[test]
         fn allowed() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_permissions(SPENDER1, ALL_PERMS)
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .with_permissions(&SPENDER1, ALL_PERMS)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
                 .init();
 
             let msgs: Vec<CosmosMsg> = vec![
                 BankMsg::Send {
-                    to_address: SPENDER2.to_owned(),
+                    to_address: SPENDER2.to_string(),
                     amount: coins(5, TOKEN1),
                 }
                 .into(),
                 StakingMsg::Delegate {
-                    validator: SPENDER2.to_owned(),
+                    validator: SPENDER2.to_string(),
                     amount: coin(8, TOKEN),
                 }
                 .into(),
                 DistributionMsg::WithdrawDelegatorReward {
-                    validator: SPENDER2.to_owned(),
+                    validator: SPENDER2.to_string(),
                 }
                 .into(),
             ];
 
             for msg in msgs {
                 let resp =
-                    query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_owned(), msg.clone())
+                    query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_string(), msg.clone())
                         .unwrap();
 
                 assert_eq!(
@@ -2107,17 +2104,17 @@ mod tests {
         #[test]
         fn not_enough_allowance() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
                 .init();
 
             let msg: CosmosMsg = BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(16, TOKEN1),
             }
             .into();
 
             let resp =
-                query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_owned(), msg).unwrap();
+                query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_string(), msg).unwrap();
 
             assert_eq!(resp, CanExecuteResponse { can_execute: false });
         }
@@ -2125,18 +2122,18 @@ mod tests {
         #[test]
         fn expired_allowance() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_allowance(SPENDER1, coin(10, TOKEN1))
-                .expire_allowances(SPENDER1, EXPIRED_TIME)
+                .with_allowance(&SPENDER1, coin(10, TOKEN1))
+                .expire_allowances(&SPENDER1, EXPIRED_TIME)
                 .init();
 
             let msg: CosmosMsg = BankMsg::Send {
-                to_address: SPENDER2.to_owned(),
+                to_address: SPENDER2.to_string(),
                 amount: coins(5, TOKEN1),
             }
             .into();
 
             let resp =
-                query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_owned(), msg).unwrap();
+                query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_string(), msg).unwrap();
 
             assert_eq!(resp, CanExecuteResponse { can_execute: false });
         }
@@ -2144,24 +2141,24 @@ mod tests {
         #[test]
         fn missing_permissions() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_permissions(SPENDER1, NO_PERMS)
+                .with_permissions(&SPENDER1, NO_PERMS)
                 .init();
 
             let msgs: Vec<CosmosMsg> = vec![
                 StakingMsg::Delegate {
-                    validator: SPENDER2.to_owned(),
+                    validator: SPENDER2.to_string(),
                     amount: coin(8, TOKEN),
                 }
                 .into(),
                 DistributionMsg::WithdrawDelegatorReward {
-                    validator: SPENDER2.to_owned(),
+                    validator: SPENDER2.to_string(),
                 }
                 .into(),
             ];
 
             for msg in msgs {
                 let resp =
-                    query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_owned(), msg.clone())
+                    query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_string(), msg.clone())
                         .unwrap();
 
                 assert_eq!(
@@ -2175,34 +2172,34 @@ mod tests {
         #[test]
         fn custom() {
             let Suite { deps, .. } = SuiteConfig::new()
-                .with_permissions(SPENDER1, ALL_PERMS)
+                .with_permissions(&SPENDER1, ALL_PERMS)
                 .init();
 
             let msg: CosmosMsg = CosmosMsg::Custom(Empty {});
 
             let resp =
-                query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_owned(), msg).unwrap();
+                query_can_execute(deps.as_ref(), mock_env(), SPENDER1.to_string(), msg).unwrap();
 
             assert_eq!(resp, CanExecuteResponse { can_execute: false });
         }
 
         #[test]
         fn admin() {
-            let Suite { deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+            let Suite { deps, .. } = SuiteConfig::new().with_admin(&ADMIN1).init();
 
             let msgs = vec![
                 BankMsg::Send {
-                    to_address: SPENDER2.to_owned(),
+                    to_address: SPENDER2.to_string(),
                     amount: coins(5, TOKEN1),
                 }
                 .into(),
                 StakingMsg::Delegate {
-                    validator: SPENDER2.to_owned(),
+                    validator: SPENDER2.to_string(),
                     amount: coin(8, TOKEN),
                 }
                 .into(),
                 DistributionMsg::WithdrawDelegatorReward {
-                    validator: SPENDER2.to_owned(),
+                    validator: SPENDER2.to_string(),
                 }
                 .into(),
                 CosmosMsg::Custom(Empty {}),
@@ -2210,7 +2207,7 @@ mod tests {
 
             for msg in msgs {
                 let resp =
-                    query_can_execute(deps.as_ref(), mock_env(), ADMIN1.to_owned(), msg.clone())
+                    query_can_execute(deps.as_ref(), mock_env(), ADMIN1.to_string(), msg.clone())
                         .unwrap();
 
                 assert_eq!(
@@ -2227,12 +2224,12 @@ mod tests {
     fn permissions_allowances_independent() {
         let mut deps = mock_dependencies();
 
-        let owner = addr!("admin0001");
+        let owner = deps.api.addr_make("admin0001");
         let admins = vec![owner.to_string()];
 
         // spender1 has every permission to stake
-        let spender1 = addr!("spender0001");
-        let spender2 = addr!("spender0002");
+        let spender1 = deps.api.addr_make("spender0001");
+        let spender2 = deps.api.addr_make("spender0002");
         let denom = "token1";
         let amount = 10000;
         let coin = coin(amount, denom);
@@ -2248,7 +2245,7 @@ mod tests {
             withdraw: true,
         };
 
-        let info = mock_info(owner, &[]);
+        let info = message_info(&owner, &[]);
         // Instantiate a contract with admins
         let instantiate_msg = InstantiateMsg {
             admins,

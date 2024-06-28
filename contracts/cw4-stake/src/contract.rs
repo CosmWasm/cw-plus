@@ -84,7 +84,7 @@ pub fn execute_bond(
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
-    // ensure the sent denom was proper
+    // ensure the denom sent was proper
     // NOTE: those clones are not needed (if we move denom, we return early),
     // but the compiler cannot see that (yet...)
     let amount = match (&cfg.denom, &amount) {
@@ -130,7 +130,7 @@ pub fn execute_receive(
     // info.sender is the address of the cw20 contract (that re-sent this message).
     // wrapper.sender is the address of the user that requested the cw20 contract to send this.
     // This cannot be fully trusted (the cw20 contract can fake it), so only use it for actions
-    // in the address's favor (like paying/bonding tokens, not withdrawls)
+    // in the address's favor (like paying/bonding tokens, not withdrawals)
     let msg: ReceiveMsg = from_json(&wrapper.msg)?;
     let balance = Balance::Cw20(Cw20CoinVerified {
         address: info.sender,
@@ -357,7 +357,9 @@ fn list_members(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use super::*;
+    use crate::error::ContractError;
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env, MockApi};
     use cosmwasm_std::{
         coin, from_json, CosmosMsg, OverflowError, OverflowOperation, StdError, Storage,
     };
@@ -365,22 +367,22 @@ mod tests {
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
     use cw_utils::Duration;
+    use once_cell::sync::Lazy;
 
-    use crate::error::ContractError;
+    fn mock_api() -> MockApi {
+        mock_dependencies().api
+    }
 
-    use easy_addr::addr;
-
-    use super::*;
-
-    const INIT_ADMIN: &str = addr!("juan");
-    const USER1: &str = addr!("someone");
-    const USER2: &str = addr!("else");
-    const USER3: &str = addr!("funny");
+    static INIT_ADMIN: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("juan"));
+    static USER1: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("someone"));
+    static USER2: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("else"));
+    static USER3: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("funny"));
     const DENOM: &str = "stake";
     const TOKENS_PER_WEIGHT: Uint128 = Uint128::new(1_000);
     const MIN_BOND: Uint128 = Uint128::new(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
-    const CW20_ADDRESS: &str = addr!("wasm");
+    static CW20_ADDRESS: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("wasm"));
+    static CREATOR: Lazy<Addr> = Lazy::new(|| mock_api().addr_make("creator"));
 
     fn default_instantiate(deps: DepsMut) {
         do_instantiate(
@@ -402,21 +404,21 @@ mod tests {
             tokens_per_weight,
             min_bond,
             unbonding_period,
-            admin: Some(INIT_ADMIN.into()),
+            admin: Some(INIT_ADMIN.to_string()),
         };
-        let info = mock_info("creator", &[]);
+        let info = message_info(&CREATOR, &[]);
         instantiate(deps, mock_env(), info, msg).unwrap();
     }
 
     fn cw20_instantiate(deps: DepsMut, unbonding_period: Duration) {
         let msg = InstantiateMsg {
-            denom: Denom::Cw20(Addr::unchecked(CW20_ADDRESS)),
+            denom: Denom::Cw20(CW20_ADDRESS.clone()),
             tokens_per_weight: TOKENS_PER_WEIGHT,
             min_bond: MIN_BOND,
             unbonding_period,
-            admin: Some(INIT_ADMIN.into()),
+            admin: Some(INIT_ADMIN.to_string()),
         };
-        let info = mock_info("creator", &[]);
+        let info = message_info(&CREATOR, &[]);
         instantiate(deps, mock_env(), info, msg).unwrap();
     }
 
@@ -424,10 +426,14 @@ mod tests {
         let mut env = mock_env();
         env.block.height += height_delta;
 
-        for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
+        for (addr, stake) in &[
+            (USER1.clone(), user1),
+            (USER2.clone(), user2),
+            (USER3.clone(), user3),
+        ] {
             if *stake != 0 {
                 let msg = ExecuteMsg::Bond {};
-                let info = mock_info(addr, &coins(*stake, DENOM));
+                let info = message_info(addr, &coins(*stake, DENOM));
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -437,14 +443,18 @@ mod tests {
         let mut env = mock_env();
         env.block.height += height_delta;
 
-        for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
+        for (addr, stake) in &[
+            (USER1.clone(), user1),
+            (USER2.clone(), user2),
+            (USER3.clone(), user3),
+        ] {
             if *stake != 0 {
                 let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
                     sender: addr.to_string(),
                     amount: Uint128::new(*stake),
                     msg: to_json_binary(&ReceiveMsg::Bond {}).unwrap(),
                 });
-                let info = mock_info(CW20_ADDRESS, &[]);
+                let info = message_info(&CW20_ADDRESS, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -454,12 +464,16 @@ mod tests {
         let mut env = mock_env();
         env.block.height += height_delta;
 
-        for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
+        for (addr, stake) in &[
+            (USER1.clone(), user1),
+            (USER2.clone(), user2),
+            (USER3.clone(), user3),
+        ] {
             if *stake != 0 {
                 let msg = ExecuteMsg::Unbond {
                     tokens: Uint128::new(*stake),
                 };
-                let info = mock_info(addr, &[]);
+                let info = message_info(addr, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -472,7 +486,7 @@ mod tests {
 
         // it worked, let's query the state
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(INIT_ADMIN.into()), res.admin);
+        assert_eq!(Some(INIT_ADMIN.to_string()), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(0, res.weight);
@@ -492,13 +506,13 @@ mod tests {
         user3_weight: Option<u64>,
         height: Option<u64>,
     ) {
-        let member1 = get_member(deps, USER1.into(), height);
+        let member1 = get_member(deps, USER1.to_string(), height);
         assert_eq!(member1, user1_weight);
 
-        let member2 = get_member(deps, USER2.into(), height);
+        let member2 = get_member(deps, USER2.to_string(), height);
         assert_eq!(member2, user2_weight);
 
-        let member3 = get_member(deps, USER3.into(), height);
+        let member3 = get_member(deps, USER3.to_string(), height);
         assert_eq!(member3, user3_weight);
 
         // this is only valid if we are not doing a historical query
@@ -525,13 +539,13 @@ mod tests {
 
     // this tests the member queries
     fn assert_stake(deps: Deps, user1_stake: u128, user2_stake: u128, user3_stake: u128) {
-        let stake1 = query_staked(deps, USER1.into()).unwrap();
+        let stake1 = query_staked(deps, USER1.to_string()).unwrap();
         assert_eq!(stake1.stake, Uint128::from(user1_stake));
 
-        let stake2 = query_staked(deps, USER2.into()).unwrap();
+        let stake2 = query_staked(deps, USER2.to_string()).unwrap();
         assert_eq!(stake2.stake, Uint128::from(user2_stake));
 
-        let stake3 = query_staked(deps, USER3.into()).unwrap();
+        let stake3 = query_staked(deps, USER3.to_string()).unwrap();
         assert_eq!(stake3.stake, Uint128::from(user3_stake));
     }
 
@@ -597,7 +611,7 @@ mod tests {
         };
         let mut env = mock_env();
         env.block.height += 5;
-        let info = mock_info(USER2, &[]);
+        let info = message_info(&USER2, &[]);
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(
             err,
@@ -647,7 +661,7 @@ mod tests {
         env.block.height += unbond_height;
         let expires = unbonding.after(&env.block);
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
+            get_claims(deps.as_ref(), &USER1),
             vec![Claim::new(7_900, expires)]
         );
 
@@ -656,7 +670,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             env,
-            mock_info(USER1, &[]),
+            message_info(&USER1, &[]),
             ExecuteMsg::Claim {},
         )
         .unwrap();
@@ -667,13 +681,13 @@ mod tests {
                 msg,
                 funds,
             }) => {
-                assert_eq!(contract_addr.as_str(), CW20_ADDRESS);
+                assert_eq!(contract_addr.as_str(), CW20_ADDRESS.as_str());
                 assert_eq!(funds.len(), 0);
                 let parsed: Cw20ExecuteMsg = from_json(msg).unwrap();
                 assert_eq!(
                     parsed,
                     Cw20ExecuteMsg::Transfer {
-                        recipient: USER1.into(),
+                        recipient: USER1.to_string(),
                         amount: Uint128::new(7_900)
                     }
                 );
@@ -696,12 +710,12 @@ mod tests {
         assert_eq!(17, total);
 
         // get member votes from raw key
-        let member2_raw = deps.storage.get(&member_key(USER2)).unwrap();
+        let member2_raw = deps.storage.get(&member_key(USER2.as_str())).unwrap();
         let member2: u64 = from_json(member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and execute misses
-        let member3_raw = deps.storage.get(&member_key(USER3));
+        let member3_raw = deps.storage.get(&member_key(USER3.as_str()));
         assert_eq!(None, member3_raw);
     }
 
@@ -723,14 +737,14 @@ mod tests {
         // check the claims for each user
         let expires = Duration::Height(UNBONDING_BLOCKS).after(&env.block);
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
+            get_claims(deps.as_ref(), &USER1),
             vec![Claim::new(4_500, expires)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER2)),
+            get_claims(deps.as_ref(), &USER2),
             vec![Claim::new(2_600, expires)]
         );
-        assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER3)), vec![]);
+        assert_eq!(get_claims(deps.as_ref(), &USER3), vec![]);
 
         // do another unbond later on
         let mut env2 = mock_env();
@@ -740,15 +754,15 @@ mod tests {
         // with updated claims
         let expires2 = Duration::Height(UNBONDING_BLOCKS).after(&env2.block);
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
+            get_claims(deps.as_ref(), &USER1),
             vec![Claim::new(4_500, expires)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER2)),
+            get_claims(deps.as_ref(), &USER2),
             vec![Claim::new(2_600, expires), Claim::new(1_345, expires2)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER3)),
+            get_claims(deps.as_ref(), &USER3),
             vec![Claim::new(1_500, expires2)]
         );
 
@@ -756,7 +770,7 @@ mod tests {
         let err = execute(
             deps.as_mut(),
             env2,
-            mock_info(USER1, &[]),
+            message_info(&USER1, &[]),
             ExecuteMsg::Claim {},
         )
         .unwrap_err();
@@ -769,14 +783,14 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             env3.clone(),
-            mock_info(USER1, &[]),
+            message_info(&USER1, &[]),
             ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(
             res.messages,
             vec![SubMsg::new(BankMsg::Send {
-                to_address: USER1.into(),
+                to_address: USER1.to_string(),
                 amount: coins(4_500, DENOM),
             })]
         );
@@ -785,14 +799,14 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             env3.clone(),
-            mock_info(USER2, &[]),
+            message_info(&USER2, &[]),
             ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(
             res.messages,
             vec![SubMsg::new(BankMsg::Send {
-                to_address: USER2.into(),
+                to_address: USER2.to_string(),
                 amount: coins(2_600, DENOM),
             })]
         );
@@ -801,20 +815,20 @@ mod tests {
         let err = execute(
             deps.as_mut(),
             env3,
-            mock_info(USER3, &[]),
+            message_info(&USER3, &[]),
             ExecuteMsg::Claim {},
         )
         .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
 
         // claims updated properly
-        assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER1)), vec![]);
+        assert_eq!(get_claims(deps.as_ref(), &USER1), vec![]);
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER2)),
+            get_claims(deps.as_ref(), &USER2),
             vec![Claim::new(1_345, expires2)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), &Addr::unchecked(USER3)),
+            get_claims(deps.as_ref(), &USER3),
             vec![Claim::new(1_500, expires2)]
         );
 
@@ -828,19 +842,19 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             env4,
-            mock_info(USER2, &[]),
+            message_info(&USER2, &[]),
             ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(
             res.messages,
             vec![SubMsg::new(BankMsg::Send {
-                to_address: USER2.into(),
+                to_address: USER2.to_string(),
                 // 1_345 + 600 + 1_005
                 amount: coins(2_950, DENOM),
             })]
         );
-        assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER2)), vec![]);
+        assert_eq!(get_claims(deps.as_ref(), &USER2), vec![]);
     }
 
     #[test]
@@ -860,7 +874,7 @@ mod tests {
         };
 
         // non-admin cannot add hook
-        let user_info = mock_info(USER1, &[]);
+        let user_info = message_info(&USER1, &[]);
         let err = execute(
             deps.as_mut(),
             mock_env(),
@@ -871,7 +885,7 @@ mod tests {
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // admin can add it, and it appears in the query
-        let admin_info = mock_info(INIT_ADMIN, &[]);
+        let admin_info = message_info(&INIT_ADMIN, &[]);
         let _ = execute(
             deps.as_mut(),
             mock_env(),
@@ -924,7 +938,7 @@ mod tests {
         let contract2 = deps.api.addr_make("hook2").to_string();
 
         // register 2 hooks
-        let admin_info = mock_info(INIT_ADMIN, &[]);
+        let admin_info = message_info(&INIT_ADMIN, &[]);
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
@@ -937,13 +951,13 @@ mod tests {
 
         // check firing on bond
         assert_users(deps.as_ref(), None, None, None, None);
-        let info = mock_info(USER1, &coins(13_800, DENOM));
+        let info = message_info(&USER1, &coins(13_800, DENOM));
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
         assert_users(deps.as_ref(), Some(13), None, None, None);
 
         // ensure messages for each of the 2 hooks
         assert_eq!(res.messages.len(), 2);
-        let diff = MemberDiff::new(USER1, None, Some(13));
+        let diff = MemberDiff::new(USER1.to_string(), None, Some(13));
         let hook_msg = MemberChangedHookMsg::one(diff);
         let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1.clone()).unwrap());
         let msg2 = SubMsg::new(hook_msg.into_cosmos_msg(contract2.clone()).unwrap());
@@ -953,13 +967,13 @@ mod tests {
         let msg = ExecuteMsg::Unbond {
             tokens: Uint128::new(7_300),
         };
-        let info = mock_info(USER1, &[]);
+        let info = message_info(&USER1, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_users(deps.as_ref(), Some(6), None, None, None);
 
         // ensure messages for each of the 2 hooks
         assert_eq!(res.messages.len(), 2);
-        let diff = MemberDiff::new(USER1, Some(13), Some(6));
+        let diff = MemberDiff::new(USER1.to_string(), Some(13), Some(6));
         let hook_msg = MemberChangedHookMsg::one(diff);
         let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1).unwrap());
         let msg2 = SubMsg::new(hook_msg.into_cosmos_msg(contract2).unwrap());
@@ -972,23 +986,23 @@ mod tests {
         default_instantiate(deps.as_mut());
 
         // cannot bond with 0 coins
-        let info = mock_info(USER1, &[]);
+        let info = message_info(&USER1, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::NoFunds {});
 
         // cannot bond with incorrect denom
-        let info = mock_info(USER1, &[coin(500, "FOO")]);
+        let info = message_info(&USER1, &[coin(500, "FOO")]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::MissingDenom(DENOM.to_string()));
 
         // cannot bond with 2 coins (even if one is correct)
-        let info = mock_info(USER1, &[coin(1234, DENOM), coin(5000, "BAR")]);
+        let info = message_info(&USER1, &[coin(1234, DENOM), coin(5000, "BAR")]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::ExtraDenoms(DENOM.to_string()));
 
         // can bond with just the proper denom
         // cannot bond with incorrect denom
-        let info = mock_info(USER1, &[coin(500, DENOM)]);
+        let info = message_info(&USER1, &[coin(500, DENOM)]);
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
     }
 

@@ -31,8 +31,6 @@ thiserror = { workspace = true }
 semver = { workspace = true }
 
 [dev-dependencies]
-cw1-whitelist = { workspace = true, features = [
-  "library",
-  "test-utils",
-] }
+cw1-whitelist = { workspace = true, features = ["library", "test-utils"] }
+once_cell = "1.19.0"
 easy-addr = { workspace = true }
