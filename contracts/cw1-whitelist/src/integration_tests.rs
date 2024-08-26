@@ -1,7 +1,10 @@
 use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError, WasmMsg, WasmQuery};
+use cosmwasm_std::{
+    testing::mock_dependencies, to_json_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError,
+    WasmMsg, WasmQuery,
+};
 use cw1::Cw1Contract;
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
 use derivative::Derivative;
@@ -35,7 +38,7 @@ pub struct Suite {
 impl Suite {
     pub fn init() -> Result<Suite> {
         let mut app = mock_app();
-        let owner = "owner".to_owned();
+        let owner = mock_dependencies().api.addr_make("owner").to_string();
         let cw1_id = app.store_code(contract_cw1());
 
         Ok(Suite { app, owner, cw1_id })
@@ -68,7 +71,7 @@ impl Suite {
         let execute: ExecuteMsg = ExecuteMsg::Execute {
             msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: target_contract.to_string(),
-                msg: to_binary(&msg)?,
+                msg: to_json_binary(&msg)?,
                 funds: vec![],
             })],
         };
@@ -88,7 +91,7 @@ impl Suite {
     {
         self.app.wrap().query(&QueryRequest::Wasm(WasmQuery::Smart {
             contract_addr: target_contract.to_string(),
-            msg: to_binary(&msg).unwrap(),
+            msg: to_json_binary(&msg).unwrap(),
         }))
     }
 }

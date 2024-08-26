@@ -83,7 +83,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, DepsMut, Uint128};
+    use cosmwasm_std::{coins, from_json, DepsMut, Uint128};
     use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query, query_token_info};
@@ -112,10 +112,10 @@ mod tests {
     fn query_all_owner_allowances_works() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let owner = String::from("owner");
+        let owner = deps.api.addr_make("owner").to_string();
         // these are in alphabetical order same than insert order
-        let spender1 = String::from("earlier");
-        let spender2 = String::from("later");
+        let spender1 = deps.api.addr_make("earlier").to_string();
+        let spender2 = deps.api.addr_make("later").to_string();
 
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
@@ -176,10 +176,15 @@ mod tests {
     fn query_all_spender_allowances_works() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
+        let mut addresses = [
+            deps.api.addr_make("owner1").to_string(),
+            deps.api.addr_make("owner2").to_string(),
+            deps.api.addr_make("spender").to_string(),
+        ];
+        addresses.sort();
+
         // these are in alphabetical order same than insert order
-        let owner1 = String::from("owner1");
-        let owner2 = String::from("owner2");
-        let spender = String::from("spender");
+        let [owner1, owner2, spender] = addresses;
 
         let info = mock_info(owner1.as_ref(), &[]);
         let env = mock_env();
@@ -220,7 +225,7 @@ mod tests {
             limit: None,
         };
         let allowances: AllSpenderAllowancesResponse =
-            from_binary(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
+            from_json(query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
         // one is owner1 (order of CanonicalAddr uncorrelated with String)
@@ -230,7 +235,7 @@ mod tests {
             limit: Some(1),
         };
         let allowances: AllSpenderAllowancesResponse =
-            from_binary(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
+            from_json(query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.owner, &owner1);
@@ -244,7 +249,7 @@ mod tests {
             limit: Some(10000),
         };
         let allowances: AllSpenderAllowancesResponse =
-            from_binary(&query(deps.as_ref(), env, msg).unwrap()).unwrap();
+            from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.owner, &owner2);
@@ -257,11 +262,13 @@ mod tests {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
         // insert order and lexicographical order are different
-        let acct1 = String::from("acct01");
-        let acct2 = String::from("zebra");
-        let acct3 = String::from("nice");
-        let acct4 = String::from("aaaardvark");
-        let expected_order = [acct4.clone(), acct1.clone(), acct3.clone(), acct2.clone()];
+        let acct1 = deps.api.addr_make("acct1").to_string();
+        let acct2 = deps.api.addr_make("zebra").to_string();
+        let acct3 = deps.api.addr_make("nice").to_string();
+        let acct4 = deps.api.addr_make("aaardvark").to_string();
+
+        let mut expected_order = [acct1.clone(), acct2.clone(), acct3.clone(), acct4.clone()];
+        expected_order.sort();
 
         do_instantiate(deps.as_mut(), &acct1, Uint128::new(12340000));
 

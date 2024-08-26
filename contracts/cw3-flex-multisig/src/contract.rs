@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    to_json_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
     Response, StdResult,
 };
 
@@ -307,26 +307,30 @@ pub fn execute_membership_hook(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
-        QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, env, proposal_id)?),
-        QueryMsg::Vote { proposal_id, voter } => to_binary(&query_vote(deps, proposal_id, voter)?),
+        QueryMsg::Threshold {} => to_json_binary(&query_threshold(deps)?),
+        QueryMsg::Proposal { proposal_id } => {
+            to_json_binary(&query_proposal(deps, env, proposal_id)?)
+        }
+        QueryMsg::Vote { proposal_id, voter } => {
+            to_json_binary(&query_vote(deps, proposal_id, voter)?)
+        }
         QueryMsg::ListProposals { start_after, limit } => {
-            to_binary(&list_proposals(deps, env, start_after, limit)?)
+            to_json_binary(&list_proposals(deps, env, start_after, limit)?)
         }
         QueryMsg::ReverseProposals {
             start_before,
             limit,
-        } => to_binary(&reverse_proposals(deps, env, start_before, limit)?),
+        } => to_json_binary(&reverse_proposals(deps, env, start_before, limit)?),
         QueryMsg::ListVotes {
             proposal_id,
             start_after,
             limit,
-        } => to_binary(&list_votes(deps, proposal_id, start_after, limit)?),
-        QueryMsg::Voter { address } => to_binary(&query_voter(deps, address)?),
+        } => to_json_binary(&list_votes(deps, proposal_id, start_after, limit)?),
+        QueryMsg::Voter { address } => to_json_binary(&query_voter(deps, address)?),
         QueryMsg::ListVoters { start_after, limit } => {
-            to_binary(&list_voters(deps, start_after, limit)?)
+            to_json_binary(&list_voters(deps, start_after, limit)?)
         }
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
     }
 }
 
@@ -495,15 +499,18 @@ mod tests {
     };
     use cw_utils::{Duration, Threshold};
 
+    use easy_addr::addr;
+
     use super::*;
 
-    const OWNER: &str = "admin0001";
-    const VOTER1: &str = "voter0001";
-    const VOTER2: &str = "voter0002";
-    const VOTER3: &str = "voter0003";
-    const VOTER4: &str = "voter0004";
-    const VOTER5: &str = "voter0005";
-    const SOMEBODY: &str = "somebody";
+    const OWNER: &str = addr!("admin0001");
+    const VOTER1: &str = addr!("voter0001");
+    const VOTER2: &str = addr!("voter0002");
+    const VOTER3: &str = addr!("voter0003");
+    const VOTER4: &str = addr!("voter0004");
+    const VOTER5: &str = addr!("voter0005");
+    const SOMEBODY: &str = addr!("somebody");
+    const NEWBIE: &str = addr!("newbie");
 
     fn member<T: Into<String>>(addr: T, weight: u64) -> Member {
         Member {
@@ -1679,10 +1686,9 @@ mod tests {
         // updates VOTER2 power to 21 -> with snapshot, vote doesn't pass proposal
         // adds NEWBIE with 2 power -> with snapshot, invalid vote
         // removes VOTER3 -> with snapshot, can vote on proposal
-        let newbie: &str = "newbie";
         let update_msg = cw4_group::msg::ExecuteMsg::UpdateMembers {
             remove: vec![VOTER3.into()],
-            add: vec![member(VOTER2, 21), member(newbie, 2)],
+            add: vec![member(VOTER2, 21), member(NEWBIE, 2)],
         };
         app.execute_contract(Addr::unchecked(OWNER), group_addr, &update_msg, &[])
             .unwrap();
@@ -1731,7 +1737,7 @@ mod tests {
 
         // newbie cannot vote
         let err = app
-            .execute_contract(Addr::unchecked(newbie), flex_addr.clone(), &yes_vote, &[])
+            .execute_contract(Addr::unchecked(NEWBIE), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
         assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
@@ -1917,10 +1923,9 @@ mod tests {
         app.update_block(|block| block.height += 2);
 
         // admin changes the group (3 -> 0, 2 -> 9, 0 -> 29) - total = 56, require 29 to pass
-        let newbie: &str = "newbie";
         let update_msg = cw4_group::msg::ExecuteMsg::UpdateMembers {
             remove: vec![VOTER3.into()],
-            add: vec![member(VOTER2, 9), member(newbie, 29)],
+            add: vec![member(VOTER2, 9), member(NEWBIE, 29)],
         };
         app.execute_contract(Addr::unchecked(OWNER), group_addr, &update_msg, &[])
             .unwrap();
@@ -1941,7 +1946,7 @@ mod tests {
         // new proposal can be passed single-handedly by newbie
         let proposal = pay_somebody_proposal();
         let res = app
-            .execute_contract(Addr::unchecked(newbie), flex_addr.clone(), &proposal, &[])
+            .execute_contract(Addr::unchecked(NEWBIE), flex_addr.clone(), &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
         let proposal_id2: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
@@ -2002,10 +2007,9 @@ mod tests {
         app.update_block(|block| block.height += 2);
 
         // admin changes the group (3 -> 0, 2 -> 9, 0 -> 28) - total = 55, require 28 to pass
-        let newbie: &str = "newbie";
         let update_msg = cw4_group::msg::ExecuteMsg::UpdateMembers {
             remove: vec![VOTER3.into()],
-            add: vec![member(VOTER2, 9), member(newbie, 29)],
+            add: vec![member(VOTER2, 9), member(NEWBIE, 29)],
         };
         app.execute_contract(Addr::unchecked(OWNER), group_addr, &update_msg, &[])
             .unwrap();

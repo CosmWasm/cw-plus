@@ -1,6 +1,6 @@
 [package]
 name = "cw3-fixed-multisig"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implementing cw3 with an fixed group multisig"
@@ -13,22 +13,22 @@ documentation = "https://docs.cosmwasm.com"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 
 [dependencies]
-cosmwasm-schema = { version = "1.4.0" }
-cw-utils = "1.0.1"
-cw2 = { path = "../../packages/cw2", version = "1.1.2" }
-cw3 = { path = "../../packages/cw3", version = "1.1.2" }
-cw-storage-plus = "1.1.0"
-cosmwasm-std = { version = "1.4.0" }
-schemars = "0.8.15"
-serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.49" }
+cosmwasm-schema = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw3 = { workspace = true }
+cw-storage-plus = { workspace = true }
+cosmwasm-std = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-cw20 = { path = "../../packages/cw20", version = "1.1.2" }
-cw20-base = { path = "../cw20-base", version = "1.1.2", features = ["library"] }
-cw-multi-test = "0.16.1"
+cw20 = { workspace = true }
+cw20-base = { workspace = true }
+cw-multi-test = { workspace = true }
+easy-addr = { workspace = true }

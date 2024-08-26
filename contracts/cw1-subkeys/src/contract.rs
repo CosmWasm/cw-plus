@@ -5,8 +5,8 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, ensure_ne, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg,
-    Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
+    ensure, ensure_ne, to_json_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut,
+    DistributionMsg, Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
 };
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
@@ -304,17 +304,17 @@ where
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
-        QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, env, spender)?),
-        QueryMsg::Permissions { spender } => to_binary(&query_permissions(deps, spender)?),
+        QueryMsg::AdminList {} => to_json_binary(&query_admin_list(deps)?),
+        QueryMsg::Allowance { spender } => to_json_binary(&query_allowance(deps, env, spender)?),
+        QueryMsg::Permissions { spender } => to_json_binary(&query_permissions(deps, spender)?),
         QueryMsg::CanExecute { sender, msg } => {
-            to_binary(&query_can_execute(deps, env, sender, msg)?)
+            to_json_binary(&query_can_execute(deps, env, sender, msg)?)
         }
         QueryMsg::AllAllowances { start_after, limit } => {
-            to_binary(&query_all_allowances(deps, env, start_after, limit)?)
+            to_json_binary(&query_all_allowances(deps, env, start_after, limit)?)
         }
         QueryMsg::AllPermissions { start_after, limit } => {
-            to_binary(&query_all_permissions(deps, start_after, limit)?)
+            to_json_binary(&query_all_permissions(deps, start_after, limit)?)
         }
     }
 }
@@ -453,7 +453,7 @@ pub fn query_all_permissions(
 }
 
 // Migrate contract if version is lower than current version
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse()?;
     let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;
@@ -479,21 +479,23 @@ mod tests {
     use cw2::{get_contract_version, ContractVersion};
     use cw_utils::NativeBalance;
 
+    use easy_addr::addr;
+
     use crate::state::Permissions;
 
     use std::collections::HashMap;
 
     use super::*;
 
-    const OWNER: &str = "owner";
+    const OWNER: &str = addr!("owner");
 
-    const ADMIN1: &str = "admin1";
-    const ADMIN2: &str = "admin2";
+    const ADMIN1: &str = addr!("admin1");
+    const ADMIN2: &str = addr!("admin2");
 
-    const SPENDER1: &str = "spender1";
-    const SPENDER2: &str = "spender2";
-    const SPENDER3: &str = "spender3";
-    const SPENDER4: &str = "spender4";
+    const SPENDER1: &str = addr!("spender1");
+    const SPENDER2: &str = addr!("spender2");
+    const SPENDER3: &str = addr!("spender3");
+    const SPENDER4: &str = addr!("spender4");
 
     const TOKEN: &str = "token";
     const TOKEN1: &str = "token1";
@@ -2225,12 +2227,12 @@ mod tests {
     fn permissions_allowances_independent() {
         let mut deps = mock_dependencies();
 
-        let owner = "admin0001";
+        let owner = addr!("admin0001");
         let admins = vec![owner.to_string()];
 
         // spender1 has every permission to stake
-        let spender1 = "spender0001";
-        let spender2 = "spender0002";
+        let spender1 = addr!("spender0001");
+        let spender2 = addr!("spender0002");
         let denom = "token1";
         let amount = 10000;
         let coin = coin(amount, denom);

@@ -5,14 +5,9 @@
 | Specification | Crates.io                                                                                       | Docs                                                            | Coverage                                                                                                                                  |
 | ------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | cw1           | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)    | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw2           | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)    | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw3           | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)    | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw4           | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)    | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw20          | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20) | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-
-| Utilities      | Crates.io                                                                                                                     | Docs                                                                                | Coverage                                                                                                                                  |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| cw-controllers | [![cw-controllers on crates.io](https://img.shields.io/crates/v/cw-controllers.svg)](https://crates.io/crates/cw-controllers) | [![Docs](https://docs.rs/cw-controllers/badge.svg)](https://docs.rs/cw-controllers) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 
 | Contracts          | Download                                                                                                 | Docs                                                                                        | Coverage                                                                                                                                  |
 | ------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -24,6 +19,9 @@
 | cw4-stake          | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw20-base          | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw20-ics20         | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw20_ics20.wasm)         | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)                 | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+
+Note: `cw2` and `controllers` have been moved to the [`cw-minus` repo](https://github.com/CosmWasm/cw-minus) and can be
+followed there.
 
 Note: `cw721` and `cw721-base` have moved to the new [`cw-nfts` repo](https://github.com/CosmWasm/cw-nfts) and can be
 followed there.
@@ -104,7 +102,7 @@ To compile all the contracts, run the following in the repo root:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.13.0
+  cosmwasm/optimizer:0.16.0
 ```
 
 This will compile all packages in the `contracts` directory and output the stripped and optimized wasm code under the
@@ -172,9 +170,6 @@ key which you can pass using `--token` flag.
 There's also a convenience `scripts/update_changelog.sh`, which can take a --since-tag parameter (to avoid processing
 the entire history). It can also auto-detect the latest version tag for you, with --latest-tag.
 
-## Licenses
+## License
 
 This repo is licensed under [Apache 2.0](./LICENSE).
-
-All _specifications_ will always be Apache-2.0. All contracts that are meant to be _building blocks_ will also be
-Apache-2.0. This is along the lines of Open Zeppelin or other public references.
