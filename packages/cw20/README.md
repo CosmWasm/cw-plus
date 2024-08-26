@@ -56,7 +56,7 @@ Attributes emitted:
 Return type is `BalanceResponse{balance}`.
 
 `TokenInfo{}` - Returns the token info of the contract. Return type is
-`TokenInfoResponse{name, symbol, decimal, total_supply}`.
+`TokenInfoResponse{name, symbol, decimals, total_supply}`.
 
 ### Receiver
 
