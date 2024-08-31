@@ -1,5 +1,4 @@
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_schema::cw_serde;
@@ -31,8 +30,8 @@ where
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, JsonSchema, Debug)]
-#[serde(rename_all = "lowercase")]
+#[cw_serde]
+#[derive(Copy, Eq)]
 pub enum Vote {
     /// Marks support for the proposal.
     Yes,

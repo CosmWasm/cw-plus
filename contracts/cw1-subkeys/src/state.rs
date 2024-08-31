@@ -1,7 +1,6 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use cw_storage_plus::Map;
 use cw_utils::{Expiration, NativeBalance};
@@ -10,7 +9,8 @@ use cw_utils::{Expiration, NativeBalance};
 // Could have implemented permissions for each cosmos module(StakingPermissions, GovPermissions etc...)
 // But that meant a lot of code for each module. Keeping the permissions inside one struct is more
 // optimal. Define other modules permissions here.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema, Default, Copy)]
+#[cw_serde]
+#[derive(Eq, Default, Copy)]
 pub struct Permissions {
     pub delegate: bool,
     pub redelegate: bool,
@@ -28,7 +28,8 @@ impl fmt::Display for Permissions {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
+#[cw_serde]
+#[derive(Default)]
 pub struct Allowance {
     pub balance: NativeBalance,
     pub expires: Expiration,
