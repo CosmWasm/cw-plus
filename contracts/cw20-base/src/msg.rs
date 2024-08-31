@@ -1,8 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{StdError, StdResult, Uint128};
 use cw20::{Cw20Coin, Logo, MinterResponse};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 pub use cw20::Cw20ExecuteMsg as ExecuteMsg;
 
@@ -122,7 +120,7 @@ pub enum QueryMsg {
     DownloadLogo {},
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}
 
 #[cfg(test)]
