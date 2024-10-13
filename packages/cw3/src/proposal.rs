@@ -196,10 +196,36 @@ mod test {
         // round up right over 1
         assert_eq!(2, votes_needed(3, Decimal::permille(334)));
         assert_eq!(11, votes_needed(30, Decimal::permille(334)));
+        // round up to full number of votes
+        assert_eq!(420, votes_needed(420, Decimal::permille(999)));
 
         // exact matches don't round
         assert_eq!(17, votes_needed(34, Decimal::percent(50)));
         assert_eq!(12, votes_needed(48, Decimal::percent(25)));
+
+        for x in [
+            0,
+            1,
+            2,
+            3,
+            10,
+            17,
+            456,
+            2020,
+            7697987,
+            18446744073709552,
+            u64::MAX,
+        ] {
+            assert_eq!(votes_needed(x, Decimal::zero()), 0);
+            assert_eq!(votes_needed(x, Decimal::one()), x);
+            if x % 2 == 0 {
+                // even
+                assert_eq!(votes_needed(x, Decimal::percent(50)), x / 2);
+            } else {
+                // odd
+                assert_eq!(votes_needed(x, Decimal::percent(50)), x / 2 + 1);
+            }
+        }
     }
 
     fn setup_prop(
