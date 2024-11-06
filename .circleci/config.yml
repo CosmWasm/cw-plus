@@ -455,7 +455,7 @@ jobs:
       - run:
           name: Install cosmwasm-check
           # Uses --debug for compilation speed
-          command: cargo install --locked --debug --version 2.0.0-rc.1 cosmwasm-check
+          command: cargo install --locked --debug cosmwasm-check
       - save_cache:
           paths:
             - /usr/local/cargo/registry
