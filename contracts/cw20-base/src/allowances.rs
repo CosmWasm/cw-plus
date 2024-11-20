@@ -25,7 +25,6 @@ pub fn execute_increase_allowance(
         let mut val = allow
             .filter(|a| !a.expires.is_expired(&env.block))
             .unwrap_or_default();
-            
         if let Some(exp) = expires {
             if exp.is_expired(&env.block) {
                 return Err(ContractError::InvalidExpiration {});
