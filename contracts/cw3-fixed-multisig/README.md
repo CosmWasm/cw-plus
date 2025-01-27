@@ -1,7 +1,7 @@
 # CW3 Fixed Multisig
 
 This is a simple implementation of the [cw3 spec](../../packages/cw3/README.md).
-It is a multisig with a fixed set of addresses created upon instatiation.
+It is a multisig with a fixed set of addresses created upon instantiation.
 Each address may have the same weight (K of N), or some may have extra voting
 power. This works much like the native Cosmos SDK multisig, except that rather
 than aggregating the signatures off chain and submitting the final result,
