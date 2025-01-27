@@ -840,7 +840,7 @@
   [\#407](https://github.com/CosmWasm/cw-plus/issues/407)
 - Remove use of dyn in multitest Router [\#404](https://github.com/CosmWasm/cw-plus/issues/404)
 - Define generic multitest module [\#387](https://github.com/CosmWasm/cw-plus/issues/387)
-- Cw20 state key compatibity with previous versions [\#346](https://github.com/CosmWasm/cw-plus/issues/346)
+- Cw20 state key compatibility with previous versions [\#346](https://github.com/CosmWasm/cw-plus/issues/346)
 - Refactor cw20-base to use controller pattern [\#205](https://github.com/CosmWasm/cw-plus/issues/205)
 
 **Merged pull requests:**
