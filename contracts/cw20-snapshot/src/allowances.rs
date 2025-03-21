@@ -269,8 +269,8 @@ mod tests {
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
     use crate::msg::{ExecuteMsg, InstantiateMsg};
 
-    fn get_balance<T: Into<String>>(deps: Deps, address: T) -> Uint128 {
-        query_balance(deps, address.into()).unwrap().balance
+    fn get_balance<T: Into<String>>(deps: Deps, address: T, height: Option<u64>) -> Uint128 {
+        query_balance(deps, address.into(), height).unwrap().balance
     }
 
     // this will set up the instantiation for other tests
@@ -536,10 +536,10 @@ mod tests {
 
         // make sure money arrived
         assert_eq!(
-            get_balance(deps.as_ref(), owner.clone()),
+            get_balance(deps.as_ref(), owner.clone(), None),
             start.checked_sub(transfer).unwrap()
         );
-        assert_eq!(get_balance(deps.as_ref(), rcpt.clone()), transfer);
+        assert_eq!(get_balance(deps.as_ref(), rcpt.clone(), None), transfer);
 
         // ensure it looks good
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
@@ -616,7 +616,7 @@ mod tests {
 
         // make sure money burnt
         assert_eq!(
-            get_balance(deps.as_ref(), owner.clone()),
+            get_balance(deps.as_ref(), owner.clone(), None),
             start.checked_sub(transfer).unwrap()
         );
 
@@ -716,10 +716,10 @@ mod tests {
 
         // make sure money sent
         assert_eq!(
-            get_balance(deps.as_ref(), owner.clone()),
+            get_balance(deps.as_ref(), owner.clone(), None),
             start.checked_sub(transfer).unwrap()
         );
-        assert_eq!(get_balance(deps.as_ref(), contract.clone()), transfer);
+        assert_eq!(get_balance(deps.as_ref(), contract.clone(), None), transfer);
 
         // ensure it looks good
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();

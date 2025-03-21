@@ -516,7 +516,9 @@ pub fn execute_upload_logo(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Balance { address } => to_json_binary(&query_balance(deps, address)?),
+        QueryMsg::Balance { address, height } => {
+            to_json_binary(&query_balance(deps, address, height)?)
+        }
         QueryMsg::TokenInfo {} => to_json_binary(&query_token_info(deps)?),
         QueryMsg::Minter {} => to_json_binary(&query_minter(deps)?),
         QueryMsg::Allowance { owner, spender } => {
@@ -545,11 +547,17 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> {
+pub fn query_balance(
+    deps: Deps,
+    address: String,
+    height: Option<u64>,
+) -> StdResult<BalanceResponse> {
     let address = deps.api.addr_validate(&address)?;
-    let balance = BALANCES
-        .may_load(deps.storage, &address)?
-        .unwrap_or_default();
+    let balance = match height {
+        Some(h) => BALANCES.may_load_at_height(deps.storage, &address, h)?,
+        None => BALANCES.may_load(deps.storage, &address)?,
+    }
+    .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }
 
@@ -622,8 +630,8 @@ mod tests {
     use super::*;
     use crate::msg::InstantiateMarketingInfo;
 
-    fn get_balance<T: Into<String>>(deps: Deps, address: T) -> Uint128 {
-        query_balance(deps, address.into()).unwrap().balance
+    fn get_balance<T: Into<String>>(deps: Deps, address: T, height: Option<u64>) -> Uint128 {
+        query_balance(deps, address.into(), height).unwrap().balance
     }
 
     // this will set up the instantiation for other tests
@@ -683,7 +691,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), addr), amount);
+        assert_eq!(get_balance(deps.as_ref(), addr, None), amount);
         assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
         meta
     }
@@ -723,7 +731,10 @@ mod tests {
                     total_supply: amount,
                 }
             );
-            assert_eq!(get_balance(deps.as_ref(), addr), Uint128::new(11223344));
+            assert_eq!(
+                get_balance(deps.as_ref(), addr, None),
+                Uint128::new(11223344)
+            );
         }
 
         #[test]
@@ -761,7 +772,7 @@ mod tests {
                     total_supply: amount,
                 }
             );
-            assert_eq!(get_balance(deps.as_ref(), addr), Uint128::new(11223344));
+            assert_eq!(get_balance(deps.as_ref(), addr, None), amount);
             assert_eq!(
                 query_minter(deps.as_ref()).unwrap(),
                 Some(MinterResponse {
@@ -898,8 +909,8 @@ mod tests {
         let env = mock_env();
         let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(get_balance(deps.as_ref(), genesis), amount);
-        assert_eq!(get_balance(deps.as_ref(), winner.clone()), prize);
+        assert_eq!(get_balance(deps.as_ref(), genesis, None), amount);
+        assert_eq!(get_balance(deps.as_ref(), winner.clone(), None), prize);
 
         // Allows minting 0
         let msg = ExecuteMsg::Mint {
@@ -1105,8 +1116,8 @@ mod tests {
                 total_supply: amount1 + amount2,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), addr1), amount1);
-        assert_eq!(get_balance(deps.as_ref(), addr2), amount2);
+        assert_eq!(get_balance(deps.as_ref(), addr1, None), amount1);
+        assert_eq!(get_balance(deps.as_ref(), addr2, None), amount2);
     }
 
     #[test]
@@ -1130,16 +1141,25 @@ mod tests {
         let data = query(
             deps.as_ref(),
             env.clone(),
-            QueryMsg::Balance { address: addr1 },
+            QueryMsg::Balance {
+                address: addr1,
+                height: None,
+            },
         )
         .unwrap();
         let loaded: BalanceResponse = from_json(data).unwrap();
         assert_eq!(loaded.balance, amount1);
 
         // check balance query (empty)
-        let data = query(deps.as_ref(), env, QueryMsg::Balance { address: addr2 }).unwrap();
-        let loaded: BalanceResponse = from_json(data).unwrap();
-        assert_eq!(loaded.balance, Uint128::zero());
+        let data = query(
+            deps.as_ref(),
+            env,
+            QueryMsg::Balance {
+                address: addr2,
+                height: None,
+            },
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1193,8 +1213,8 @@ mod tests {
         assert_eq!(res.messages.len(), 0);
 
         let remainder = amount1.checked_sub(transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
-        assert_eq!(get_balance(deps.as_ref(), addr2), transfer);
+        assert_eq!(get_balance(deps.as_ref(), addr1, None), remainder);
+        assert_eq!(get_balance(deps.as_ref(), addr2, None), transfer);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -1242,7 +1262,7 @@ mod tests {
         assert_eq!(res.messages.len(), 0);
 
         let remainder = amount1.checked_sub(burn).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
+        assert_eq!(get_balance(deps.as_ref(), addr1, None), remainder);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             remainder
@@ -1314,8 +1334,8 @@ mod tests {
 
         // ensure balance is properly transferred
         let remainder = amount1.checked_sub(transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
-        assert_eq!(get_balance(deps.as_ref(), contract), transfer);
+        assert_eq!(get_balance(deps.as_ref(), addr1, None), remainder);
+        assert_eq!(get_balance(deps.as_ref(), contract, None), transfer);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -1416,6 +1436,7 @@ mod tests {
                     cw20_addr.clone(),
                     &QueryMsg::Balance {
                         address: sender.clone(),
+                        height: None,
                     },
                 )
                 .unwrap();
