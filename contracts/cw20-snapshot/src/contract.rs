@@ -245,7 +245,6 @@ pub fn execute_transfer(
 ) -> Result<Response, ContractError> {
     let rcpt_addr = deps.api.addr_validate(&recipient)?;
     let height = env.block.height;
-
     BALANCES.update(
         deps.storage,
         &info.sender,
@@ -1160,6 +1159,108 @@ mod tests {
             },
         )
         .unwrap();
+    }
+
+    #[test]
+    fn query_balance_at_height_works() {
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let addr1 = deps.api.addr_make("addr0001").to_string();
+        let addr2 = deps.api.addr_make("addr0002").to_string();
+        let amount1 = Uint128::from(12340000u128);
+
+        // Instantiate the contract
+        do_instantiate(deps.as_mut(), &addr1, amount1);
+
+        // Transfer some tokens at height + 5
+        let mut env = mock_env();
+        env.block.height += 5;
+        let transfer1 = Uint128::from(54321u128);
+        let msg = ExecuteMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: transfer1,
+        };
+        let info = mock_info(&addr1, &[]);
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Check balances at before and after the transfer
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr1, Some(env.block.height)),
+            amount1
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr1, Some(env.block.height + 1)),
+            amount1.checked_sub(transfer1).unwrap()
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr2, Some(env.block.height + 1)),
+            transfer1
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr2, Some(env.block.height)),
+            Uint128::zero()
+        );
+
+        // Transfer more tokens at height +  10
+        env.block.height += 10;
+        let transfer2 = Uint128::from(12345u128);
+        let msg = ExecuteMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: transfer2,
+        };
+        let info = mock_info(&addr1, &[]);
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // Check balances at different heights
+
+        // At height 0 (initial state)
+        assert_eq!(get_balance(deps.as_ref(), &addr1, Some(0)), Uint128::zero());
+        assert_eq!(get_balance(deps.as_ref(), &addr2, Some(0)), Uint128::zero());
+
+        // At height 10 (after second transfer)
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr1, Some(env.block.height)),
+            amount1.checked_sub(transfer1).unwrap()
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr1, Some(env.block.height + 1)),
+            amount1
+                .checked_sub(transfer1)
+                .unwrap()
+                .checked_sub(transfer2)
+                .unwrap()
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr2, Some(env.block.height)),
+            transfer1
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr2, Some(env.block.height + 1)),
+            transfer1.checked_add(transfer2).unwrap()
+        );
+
+        // Current height (should be same as height 10)
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr1, None),
+            amount1
+                .checked_sub(transfer1)
+                .unwrap()
+                .checked_sub(transfer2)
+                .unwrap()
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr2, None),
+            transfer1.checked_add(transfer2).unwrap()
+        );
+
+        // Query a height in between snapshots (should return closest height <= query height)
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr1, Some(env.block.height - 10)),
+            get_balance(deps.as_ref(), &addr1, Some(env.block.height - 11))
+        );
+        assert_eq!(
+            get_balance(deps.as_ref(), &addr2, Some(env.block.height - 10)),
+            get_balance(deps.as_ref(), &addr2, Some(env.block.height - 11))
+        );
     }
 
     #[test]

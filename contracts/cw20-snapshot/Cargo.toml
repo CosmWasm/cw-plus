@@ -1,6 +1,6 @@
 [package]
 name = "cw20-snapshot"
-version.workspace = true
+version = { workspace = true }
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Basic implementation of a CosmWasm-20 compliant token"
