@@ -1,4 +1,4 @@
-# CosmWasm Plus
+# CosmWasm Plus test
 
 [![CircleCI](https://circleci.com/gh/CosmWasm/cw-plus/tree/main.svg?style=shield)](https://circleci.com/gh/CosmWasm/cw-plus/tree/main)
 
