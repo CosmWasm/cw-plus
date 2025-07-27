@@ -403,7 +403,7 @@
 - Reject proposals early [\#668](https://github.com/CosmWasm/cw-plus/pull/668) ([Callum-A](https://github.com/Callum-A))
 - cw20-base: validate addresses are unique in initial balances [\#659](https://github.com/CosmWasm/cw-plus/pull/659)
   ([harryscholes](https://github.com/harryscholes))
-- New SECURITY.md refering to wasmd [\#624](https://github.com/CosmWasm/cw-plus/pull/624)
+- New SECURITY.md referring to wasmd [\#624](https://github.com/CosmWasm/cw-plus/pull/624)
   ([ethanfrey](https://github.com/ethanfrey))
 
 ## [v0.13.0](https://github.com/CosmWasm/cw-plus/tree/v0.13.0) (2022-03-09)
