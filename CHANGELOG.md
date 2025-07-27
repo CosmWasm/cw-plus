@@ -1078,7 +1078,7 @@
 - Proper event/data handling on reply in multitest [\#326](https://github.com/CosmWasm/cw-plus/issues/326)
 - Messages differ for cw20 & cw20_base [\#320](https://github.com/CosmWasm/cw-plus/issues/320)
 - Upgrade cw20-staking to cw 15 [\#312](https://github.com/CosmWasm/cw-plus/issues/312)
-- Uprade cw20-ics20 to cw 0.15 [\#311](https://github.com/CosmWasm/cw-plus/issues/311)
+- Upgrade cw20-ics20 to cw 0.15 [\#311](https://github.com/CosmWasm/cw-plus/issues/311)
 - Upgrade cw20-escrow to 0.15 [\#309](https://github.com/CosmWasm/cw-plus/issues/309)
 - Upgrade cw20-bonding to 0.15 [\#307](https://github.com/CosmWasm/cw-plus/issues/307)
 - cw1-subkeys [\#305](https://github.com/CosmWasm/cw-plus/issues/305)
