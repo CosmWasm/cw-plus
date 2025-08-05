@@ -236,5 +236,41 @@ jobs:
       - run: cargo test --locked
       - run: cargo schema --locked
 
+  package_cw20:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw20-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
 
-
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target/debug/.fingerprint
+            target/debug/build
+            target/debug/deps
+          key: lint-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt -- --check
+      - run: cargo clippy --all-targets -- -D warnings
