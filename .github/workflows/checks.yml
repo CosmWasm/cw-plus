@@ -113,3 +113,68 @@ jobs:
           RUST_BACKTRACE: 1
       - run: cargo schema --locked
 
+  contract_cw4_stake:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw4-stake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw4-stake-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw20_base:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw20-base
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw20-base-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw20_ics20:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw20-ics20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw20-ics20-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+
+
