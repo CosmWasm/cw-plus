@@ -19,9 +19,29 @@ jobs:
         with:
           path: |
             ~/.cargo/registry
-            ~/.cargo/git
             target
           key: cw1-subkeys-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw1_whitelist:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw1-whitelist
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw1-whitelist-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.76.0
