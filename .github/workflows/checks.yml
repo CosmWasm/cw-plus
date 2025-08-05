@@ -176,5 +176,65 @@ jobs:
           RUST_BACKTRACE: 1
       - run: cargo schema --locked
 
+  package_cw1:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw1-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
+  package_cw3:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
+  package_cw4:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw4-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
 
 
