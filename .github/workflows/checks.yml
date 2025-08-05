@@ -70,3 +70,46 @@ jobs:
         env:
           RUST_BACKTRACE: 1
       - run: cargo schema --locked
+
+  contract_cw3_flex_multisig:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw3-flex-multisig
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw3-flex-multisig-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw4_group:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw4-group
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw4-group-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
