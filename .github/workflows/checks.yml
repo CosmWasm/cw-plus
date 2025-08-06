@@ -274,3 +274,25 @@ jobs:
       - run: rustup component add rustfmt clippy
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets -- -D warnings
+
+  wasm-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.76.0
+      - run: rustup target add wasm32-unknown-unknown
+      - run: |
+          for C in ./contracts/*/; do
+            echo "Compiling $(basename $C)..."
+            (cd $C && cargo build --release --lib --target wasm32-unknown-unknown --locked)
+          done
+      - run: cargo install --locked --debug --version 2.0.0-rc.1 cosmwasm-check
+      - run: cosmwasm-check ./target/wasm32-unknown-unknown/release/*.wasm
