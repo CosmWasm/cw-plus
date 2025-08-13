@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build development contracts
+        run: |
+          docker run --rm -v "${PWD}:/code" cosmwasm/optimizer:0.16.0
+
+      - name: Publish artifacts on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            Attached there are some build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release.
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**
+
+  build-and-upload-schemas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.76.0
+
+      - name: Create schemas directory
+        run: mkdir -p schemas
+
+      - name: Build and run schema generator for packages
+        run: |
+          set -euo pipefail
+          for S in ./packages/*/src/bin/schema.rs ; do
+            P="$(cd "$(dirname "$S")"/../.. && pwd)"
+            echo "Generating schema for $P ..."
+            (cd "$P" && cargo schema --locked && tar -zcf "$GITHUB_WORKSPACE/schemas/$(basename "$(pwd)")_schema.tar.gz" ./schema)
+          done
+
+      - name: Build and run schema generator for contracts
+        run: |
+          set -euo pipefail
+          for C in ./contracts/*/ ; do
+            echo "Generating schema for $C ..."
+            (cd "$C" && cargo schema --locked && mv ./schema/*.json "$GITHUB_WORKSPACE/schemas/")
+          done
+
+      - name: Publish schemas on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            Attached there are some schemas and build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release.
+          files: |
+            schemas/**

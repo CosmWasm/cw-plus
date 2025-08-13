@@ -1,0 +1,270 @@
+name: checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  release:
+    types: [created]
+
+jobs:
+  contract_cw1_subkeys:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw1-subkeys
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw1-subkeys-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw1_whitelist:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw1-whitelist
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw1-whitelist-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw3_fixed_multisig:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw3-fixed-multisig
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw3-fixed-multisig-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw3_flex_multisig:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw3-flex-multisig
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw3-flex-multisig-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw4_group:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw4-group
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw4-group-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw4_stake:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw4-stake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw4-stake-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw20_base:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw20-base
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw20-base-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  contract_cw20_ics20:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/cw20-ics20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: cw20-ics20-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo unit-test --locked
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo schema --locked
+
+  package_cw1:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw1-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
+  package_cw3:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
+  package_cw4:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw4-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
+  package_cw20:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cw20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: package-cw20-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - run: cargo schema --locked
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target/debug/.fingerprint
+            target/debug/build
+            target/debug/deps
+          key: lint-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+
+  wasm-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@1.76.0
+      - run: rustup target add wasm32-unknown-unknown
+      - run: |
+          for C in ./contracts/*/; do
+            echo "Compiling $(basename $C)..."
+            (cd $C && cargo build --release --lib --target wasm32-unknown-unknown --locked)
+          done
+      - run: cargo install --locked --debug --version 2.0.0-rc.1 cosmwasm-check
+      - run: cosmwasm-check ./target/wasm32-unknown-unknown/release/*.wasm
