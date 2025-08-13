@@ -21,9 +21,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw1-subkeys-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -42,9 +40,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw1-whitelist-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -63,9 +59,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw3-fixed-multisig-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -84,9 +78,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw3-flex-multisig-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -105,9 +97,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw4-group-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -126,9 +116,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw4-stake-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -147,9 +135,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw20-base-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -168,9 +154,7 @@ jobs:
             ~/.cargo/registry
             target
           key: cw20-ics20-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo unit-test --locked
         env:
           RUST_BACKTRACE: 1
@@ -189,9 +173,7 @@ jobs:
             ~/.cargo/registry
             target
           key: package-cw1-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo build --locked
       - run: cargo test --locked
       - run: cargo schema --locked
@@ -209,9 +191,7 @@ jobs:
             ~/.cargo/registry
             target
           key: package-cw3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo build --locked
       - run: cargo test --locked
       - run: cargo schema --locked
@@ -229,9 +209,7 @@ jobs:
             ~/.cargo/registry
             target
           key: package-cw4-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo build --locked
       - run: cargo test --locked
       - run: cargo schema --locked
@@ -249,9 +227,7 @@ jobs:
             ~/.cargo/registry
             target
           key: package-cw20-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: cargo build --locked
       - run: cargo test --locked
       - run: cargo schema --locked
@@ -268,9 +244,7 @@ jobs:
             target/debug/build
             target/debug/deps
           key: lint-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: rustup component add rustfmt clippy
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets -- -D warnings
@@ -285,9 +259,7 @@ jobs:
             ~/.cargo/registry
             target
           key: wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.76.0
+      - uses: dtolnay/rust-toolchain@1.76.0
       - run: rustup target add wasm32-unknown-unknown
       - run: |
           for C in ./contracts/*/; do
