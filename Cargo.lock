@@ -383,6 +383,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20-snapshot"
+version = "2.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw20",
+ "schemars",
+ "semver",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw3"
 version = "2.0.0"
 dependencies = [
