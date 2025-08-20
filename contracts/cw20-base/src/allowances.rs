@@ -21,7 +21,10 @@ pub fn execute_increase_allowance(
     }
 
     let update_fn = |allow: Option<AllowanceResponse>| -> Result<_, _> {
-        let mut val = allow.unwrap_or_default();
+        // Filter out expired allowances, defaulting to zero
+        let mut val = allow
+            .filter(|a| !a.expires.is_expired(&env.block))
+            .unwrap_or_default();
         if let Some(exp) = expires {
             if exp.is_expired(&env.block) {
                 return Err(ContractError::InvalidExpiration {});
@@ -56,32 +59,33 @@ pub fn execute_decrease_allowance(
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let key = (&info.sender, &spender_addr);
-
-    fn reverse<'a>(t: (&'a Addr, &'a Addr)) -> (&'a Addr, &'a Addr) {
-        (t.1, t.0)
-    }
-
-    // load value and delete if it hits 0, or update otherwise
-    let mut allowance = ALLOWANCES.load(deps.storage, key)?;
-    if amount < allowance.allowance {
-        // update the new amount
-        allowance.allowance = allowance
-            .allowance
-            .checked_sub(amount)
-            .map_err(StdError::overflow)?;
+    let update_fn = |allow: Option<AllowanceResponse>| -> Result<_, _> {
+        // Filter out expired allowances, defaulting to zero
+        let mut val = allow
+            .filter(|a| !a.expires.is_expired(&env.block))
+            .unwrap_or_default();
         if let Some(exp) = expires {
             if exp.is_expired(&env.block) {
                 return Err(ContractError::InvalidExpiration {});
             }
-            allowance.expires = exp;
+            val.expires = exp;
         }
-        ALLOWANCES.save(deps.storage, key, &allowance)?;
-        ALLOWANCES_SPENDER.save(deps.storage, reverse(key), &allowance)?;
-    } else {
-        ALLOWANCES.remove(deps.storage, key);
-        ALLOWANCES_SPENDER.remove(deps.storage, reverse(key));
-    }
+
+        // Decrease allowance or remove if amount >= allowance
+        if amount < val.allowance {
+            val.allowance = val
+                .allowance
+                .checked_sub(amount)
+                .map_err(StdError::overflow)?;
+            Ok(val)
+        } else {
+            // Return None to remove the allowance
+            Ok(AllowanceResponse::default())
+        }
+    };
+
+    ALLOWANCES.update(deps.storage, (&info.sender, &spender_addr), update_fn)?;
+    ALLOWANCES_SPENDER.update(deps.storage, (&spender_addr, &info.sender), update_fn)?;
 
     let res = Response::new().add_attributes(vec![
         attr("action", "decrease_allowance"),
