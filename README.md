@@ -58,7 +58,7 @@ If you have ideas for new specifications , please [raise an issue](https://githu
 ## Contracts
 
 We provide sample contracts that either implement or consume these specifications to both provide examples, and provide
-a basis for code you can extend for more custom contacts, without worrying about reinventing the wheel each time. For
+a basis for code you can extend for more custom contracts, without worrying about reinventing the wheel each time. For
 example [`cw20-base`](./contracts/cw20-base) is a basic implementation of a `cw20` compatible contract that can be
 imported in any custom contract you want to build on it.
 
