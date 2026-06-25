@@ -5,7 +5,7 @@ Please see the [Advisories] for its security policy.
 
 [Advisories]: https://github.com/CosmWasm/advisories/blob/main/SECURITY.md
 
-> [!WARNING]  
+> [!CAUTION]  
 > The best effort has been made that the contracts here are secure, and we have moved the more
 > experimental contracts into community repositories like [cw-nfts](https://github.com/CosmWasm/cw-nfts) and
 > [cw-tokens](https://github.com/CosmWasm/cw-tokens). That said, we have not done an audit on them (formal or informal)
