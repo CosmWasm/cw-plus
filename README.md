@@ -3,8 +3,9 @@
 **Real-life smart contracts under open-source licenses**
 
 > [!CAUTION]
-> None of these contracts have been audited, and NO LIABILITY is assumed for the use of this code.
-> Smart contracts in this repository are provided to help you start your projects.
+> None of these contracts have been audited, and **NO LIABILITY** is assumed for the use of this code.
+> Smart contracts in this repository are provided as is, without any warranty or liability,
+> just to help you start your own projects. See our [Security policy](./SECURITY.md) for more details.
 
 | Specification | Crates.io                                                                                       | Docs                                                            | Coverage                                                                                                                                  |
 |---------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
