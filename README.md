@@ -34,7 +34,7 @@ This is a collection of specification and contracts designed for use in real-lif
 They are designed as examples how to solve the real-world use cases,
 and to provide a reusable basis to build many custom contracts.
 
-If you don't know what CosmWasm is, please check out our [homepage](https://cosmwasm.com) and
+If you don't know what the CosmWasm is, please check out our [homepage](https://cosmwasm.com) and
 our [documentation](https://docs.cosmwasm.com) to get more background.
  
 > [!IMPORTANT]
