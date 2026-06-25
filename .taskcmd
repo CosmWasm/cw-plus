@@ -1,0 +1,69 @@
+.note To use these task definitions, run:
+      cargo install taskcmd
+
+.vars
+  .TOOLCHAIN +1.82.0
+    .note Rust toolchain for building contracts.
+
+.tasks
+  .build
+    .desc Builds all artifacts in debug mode
+    .cmd cargo {{TOOLCHAIN}} build --workspace
+
+  .clean
+    .desc Cleans all generated artifacts
+    .cmd cargo {{TOOLCHAIN}} clean
+
+  .clippy
+    .desc Runs linter
+    .cmd cargo {{TOOLCHAIN}} clippy --all-targets --workspace
+
+  .cov
+    .desc Generates code coverage report in text format
+    .cmd cargo {{TOOLCHAIN}} llvm-cov clean
+    .cmd cargo {{TOOLCHAIN}} llvm-cov --no-cfg-coverage
+
+  .cov-html
+    .desc Generates code coverage report in HTML format
+    .cmd cargo {{TOOLCHAIN}} llvm-cov clean
+    .cmd cargo {{TOOLCHAIN}} llvm-cov --no-cfg-coverage --html
+
+  .cov-html-open
+    .desc Generates code coverage report in HTML format and opens in browser
+    .cmd cargo {{TOOLCHAIN}} llvm-cov clean
+    .cmd cargo {{TOOLCHAIN}} llvm-cov --no-cfg-coverage --html --open
+
+  .cov-cw3-flex-multisig
+    .desc Generates code coverage report for 'cw3-flex-multisig' in text format
+    .cmd cargo {{TOOLCHAIN}} llvm-cov clean
+    .cmd cargo {{TOOLCHAIN}} llvm-cov -p cw3-flex-multisig --no-cfg-coverage
+
+  .cov-cw3-flex-multisig-html
+    .desc Generates code coverage report for 'cw3-flex-multisig' in HTML format
+    .cmd cargo {{TOOLCHAIN}} llvm-cov clean
+    .cmd cargo {{TOOLCHAIN}} llvm-cov -p cw3-flex-multisig --no-cfg-coverage --html
+
+  .cov-cw3-flex-multisig-html-open
+    .desc Generates code coverage report for 'cw3-flex-multisig' in HTML format and opens in browser
+    .cmd cargo {{TOOLCHAIN}} llvm-cov clean
+    .cmd cargo {{TOOLCHAIN}} llvm-cov -p cw3-flex-multisig --no-cfg-coverage --html --open
+
+  .doc
+    .desc Generates documentation
+    .cmd cargo {{TOOLCHAIN}} doc --no-deps
+
+  .doc-open
+    .desc Generates documentation and opens in browser
+    .cmd cargo {{TOOLCHAIN}} doc --no-deps --open
+
+  .fmt
+    .desc Runs code formatter
+    .cmd cargo {{TOOLCHAIN}} fmt
+
+  .test
+    .desc Runs tests in debug mode
+    .cmd cargo {{TOOLCHAIN}} test
+
+  .testn
+    .desc Runs tests in debug mode using nextest
+    .cmd cargo {{TOOLCHAIN}} nextest run
