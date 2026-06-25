@@ -1,16 +1,14 @@
 # CosmWasm Plus
 
-[![CircleCI](https://circleci.com/gh/CosmWasm/cw-plus/tree/main.svg?style=shield)](https://circleci.com/gh/CosmWasm/cw-plus/tree/main)
-
 | Specification | Crates.io                                                                                       | Docs                                                            | Coverage                                                                                                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+|---------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | cw1           | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)    | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw3           | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)    | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw4           | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)    | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw20          | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20) | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 
 | Contracts          | Download                                                                                                 | Docs                                                                                        | Coverage                                                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+|--------------------|----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | cw1-subkeys        | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_subkeys.wasm)        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw1-whitelist      | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_whitelist.wasm)      | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)           | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw3-fixed-multisig | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw3_fixed_multisig.wasm) | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
@@ -20,24 +18,31 @@
 | cw20-base          | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw20-ics20         | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw20_ics20.wasm)         | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)                 | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 
-Note: `cw2` and `controllers` have been moved to the [`cw-minus` repo](https://github.com/CosmWasm/cw-minus) and can be
-followed there.
+> [!NOTE]
+> `cw2` and `controllers` have been moved to the [`cw-minus`](https://github.com/CosmWasm/cw-minus) repository,
+> and can be followed there.
 
-Note: `cw721` and `cw721-base` have moved to the new [`cw-nfts` repo](https://github.com/CosmWasm/cw-nfts) and can be
-followed there.
+> [!NOTE]
+> `cw721` and `cw721-base` have been moved to the new [`cw-nfts`](https://github.com/CosmWasm/cw-nfts) repository,
+> and can be followed there.
 
-Note: most of the `cw20-*` contracts besides `cw20-base` have moved to the new
-[`cw-tokens` repo](https://github.com/CosmWasm/cw-tokens) and can be followed there.
+> [!NOTE]
+> Most of the `cw20-*` contracts besides `cw20-base` have been moved to the new
+[`cw-tokens`](https://github.com/CosmWasm/cw-tokens) repository, and can be followed there.
 
-This is a collection of specification and contracts designed for use on real networks. They are designed not just as
-examples, but to solve real-world use cases, and to provide a reusable basis to build many custom contracts.
+This is a collection of specification and contracts designed for use in real-lide scenarios.
+They are designed as examples how to solve the real-world use cases,
+and to provide a reusable basis to build many custom contracts.
 
-If you don't know what CosmWasm is, please check out [our homepage](https://cosmwasm.com) and
-[our documentation](https://docs.cosmwasm.com) to get more background. We are running
-[public testnets](https://github.com/CosmWasm/testnets#running) you can use to test out any contracts.
+If you don't know what CosmWasm is, please check out our [homepage](https://cosmwasm.com) and
+our [documentation](https://docs.cosmwasm.com) to get more background.
+ 
+> [!IMPORTANT]
+> We are **NOT** running [public testnets](https://github.com/CosmWasm/testnets#running) anymore.
 
-**Warning** None of these contracts have been audited and no liability is assumed for the use of this code. They are
-provided to turbo-start your projects.
+> [!CAUTION]
+> None of these contracts have been audited, and NO LIABILITY is assumed for the use of this code.
+> Smart contracts in this repository are provided to help you start your projects.
 
 ## Specifications
 
@@ -52,8 +57,8 @@ as well as what interface we guarantee to any consumer of such contracts. This i
 can create an escrow contract that can handle many different fungible tokens, as long as they all adhere to the cw20
 specification.
 
-If you have ideas for new specifications , please [raise an issue](https://github.com/CosmWasm/cw-plus/issues) or
-[create a pull request](https://github.com/CosmWasm/cw-plus/pulls) on this repo.
+If you have ideas for new specifications , please raise an [issue](https://github.com/CosmWasm/cw-plus/issues)
+or create a [pull request](https://github.com/CosmWasm/cw-plus/pulls) in this repo.
 
 ## Contracts
 
@@ -98,7 +103,7 @@ CW20 Fungible Tokens:
 
 To compile all the contracts, run the following in the repo root:
 
-```
+```shell
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
@@ -114,7 +119,7 @@ If you hit any issues there and want to debug, you can try to run the following 
 ## Quality Control
 
 One of the basic metrics of assurance over code quality is how much is covered by unit tests. There are several tools
-available for Rust to do such analysis and we will describe one below. This should be used as a baseline metric to give
+available for Rust to do such analysis, and we will describe one below. This should be used as a baseline metric to give
 some confidence in the code.
 
 Beyond code coverage metrics, just having a robust PR review process with a few more trained eyes looking for bugs is
@@ -130,7 +135,7 @@ I recommend the use of [tarpaulin](https://github.com/xd009642/tarpaulin): `carg
 
 To get some nice interactive charts, you can go to the root directory and run:
 
-`cargo tarpaulin -o html` and then `xdg-open tarpaulin-report.html` (or just `open` on MacOS).
+`cargo tarpaulin -o html` and then `xdg-open tarpaulin-report.html` (or just `open` on macOS).
 
 Once you find a package that you want to improve, you can do the following to just analyze this package, which gives
 much faster turn-around:
@@ -138,7 +143,7 @@ much faster turn-around:
 `cargo tarpaulin -o html --packages cw3-fixed-multisig`
 
 Note that it will produce a code coverage report for the entire project, but only the coverage in that package is the
-real value. If does give quick feedback for you if you unit test writing was successful.
+real value. It is a quick feedback for you if your unit test writing was successful.
 
 ## Contributing
 
@@ -172,4 +177,4 @@ the entire history). It can also auto-detect the latest version tag for you, wit
 
 ## License
 
-This repo is licensed under [Apache 2.0](./LICENSE).
+This repository is licensed under [Apache 2.0](./LICENSE).
