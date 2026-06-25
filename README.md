@@ -30,7 +30,7 @@
 > Most of the `cw20-*` contracts besides `cw20-base` have been moved to the new
 [`cw-tokens`](https://github.com/CosmWasm/cw-tokens) repository, and can be followed there.
 
-This is a collection of specification and contracts designed for use in real-lide scenarios.
+This is a collection of specification and contracts designed for use in real-life scenarios.
 They are designed as examples how to solve the real-world use cases,
 and to provide a reusable basis to build many custom contracts.
 
