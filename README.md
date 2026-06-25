@@ -1,5 +1,11 @@
 # CosmWasm Plus
 
+**Real-life smart contracts under open-source licenses**
+
+> [!CAUTION]
+> None of these contracts have been audited, and NO LIABILITY is assumed for the use of this code.
+> Smart contracts in this repository are provided to help you start your projects.
+
 | Specification | Crates.io                                                                                       | Docs                                                            | Coverage                                                                                                                                  |
 |---------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | cw1           | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)    | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
@@ -39,10 +45,6 @@ our [documentation](https://docs.cosmwasm.com) to get more background.
  
 > [!IMPORTANT]
 > We are **NOT** running [public testnets](https://github.com/CosmWasm/testnets#running) anymore.
-
-> [!CAUTION]
-> None of these contracts have been audited, and NO LIABILITY is assumed for the use of this code.
-> Smart contracts in this repository are provided to help you start your projects.
 
 ## Specifications
 
