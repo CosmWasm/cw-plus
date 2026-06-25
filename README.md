@@ -1,16 +1,14 @@
 # CosmWasm Plus
 
-[![CircleCI](https://circleci.com/gh/CosmWasm/cw-plus/tree/main.svg?style=shield)](https://circleci.com/gh/CosmWasm/cw-plus/tree/main)
-
 | Specification | Crates.io                                                                                       | Docs                                                            | Coverage                                                                                                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+|---------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | cw1           | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)    | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw3           | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)    | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw4           | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)    | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw20          | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20) | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 
 | Contracts          | Download                                                                                                 | Docs                                                                                        | Coverage                                                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+|--------------------|----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | cw1-subkeys        | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_subkeys.wasm)        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw1-whitelist      | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_whitelist.wasm)      | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)           | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw3-fixed-multisig | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw3_fixed_multisig.wasm) | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
@@ -114,7 +112,7 @@ If you hit any issues there and want to debug, you can try to run the following 
 ## Quality Control
 
 One of the basic metrics of assurance over code quality is how much is covered by unit tests. There are several tools
-available for Rust to do such analysis and we will describe one below. This should be used as a baseline metric to give
+available for Rust to do such analysis, and we will describe one below. This should be used as a baseline metric to give
 some confidence in the code.
 
 Beyond code coverage metrics, just having a robust PR review process with a few more trained eyes looking for bugs is
@@ -130,7 +128,7 @@ I recommend the use of [tarpaulin](https://github.com/xd009642/tarpaulin): `carg
 
 To get some nice interactive charts, you can go to the root directory and run:
 
-`cargo tarpaulin -o html` and then `xdg-open tarpaulin-report.html` (or just `open` on MacOS).
+`cargo tarpaulin -o html` and then `xdg-open tarpaulin-report.html` (or just `open` on macOS).
 
 Once you find a package that you want to improve, you can do the following to just analyze this package, which gives
 much faster turn-around:
@@ -138,7 +136,7 @@ much faster turn-around:
 `cargo tarpaulin -o html --packages cw3-fixed-multisig`
 
 Note that it will produce a code coverage report for the entire project, but only the coverage in that package is the
-real value. If does give quick feedback for you if you unit test writing was successful.
+real value. It is a quick feedback for you if your unit test writing was successful.
 
 ## Contributing
 
