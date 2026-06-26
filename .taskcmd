@@ -8,7 +8,34 @@
 .tasks
   .build
     .desc Builds all artifacts in debug mode
-    .cmd cargo {{TOOLCHAIN}} build --workspace
+    .note Build packages
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./packages/cw1
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./packages/cw3
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./packages/cw4
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./packages/cw20
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./packages/easy-addr
+    .note Build contracts
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw1-subkeys
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw1-whitelist
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw3-fixed-multisig
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw3-flex-multisig
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw4-group
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw4-stake
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw20-base
+    .cmd cargo {{TOOLCHAIN}} build
+      .dir ./contracts/cw20-ics20
 
   .clean
     .desc Cleans all generated artifacts
