@@ -1,6 +1,6 @@
 [package]
 name = "easy-addr"
-version.workspace = true
+version = { workspace = true }
 edition = "2021"
 publish = false
 

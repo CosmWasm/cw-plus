@@ -1,6 +1,6 @@
 [package]
 name = "cw4-group"
-version.workspace = true
+version = { workspace = true }
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Simple cw4 implementation of group membership controlled by admin "
@@ -10,8 +10,8 @@ homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
 exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "artifacts/*",
+    # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+    "artifacts/*",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
