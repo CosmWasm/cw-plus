@@ -201,12 +201,31 @@ pub fn execute_vote(
         }),
     })?;
 
-    // update vote tally
+    // Remember the status before this vote is applied.
+    let status_before_vote = prop.status;
+
+    // Update vote tally.
     prop.votes.add_vote(vote, vote_power);
     prop.update_status(&env.block);
     PROPOSALS.save(deps.storage, proposal_id, &prop)?;
 
-    Ok(Response::new()
+    // Initialize the response.
+    let mut response = Response::new();
+
+    // If this vote rejected the proposal before expiration,
+    // and refunding was requested by the proposer, then refund the deposit.
+    if status_before_vote == Status::Open && prop.status == Status::Rejected {
+        if let Some(deposit) = &prop.deposit {
+            if deposit.refund_failed_proposals {
+                let msg = deposit.get_return_deposit_message(&prop.proposer)?;
+                // Add return deposit message to the response.
+                response = response.add_message(msg);
+            }
+        }
+    }
+
+    // Finalize the response with additional attributes.
+    Ok(response
         .add_attribute("action", "vote")
         .add_attribute("sender", info.sender)
         .add_attribute("proposal_id", proposal_id.to_string())
@@ -503,6 +522,7 @@ mod tests {
 
     use super::*;
 
+    const DENOM: &str = "TOKEN";
     const OWNER: &str = addr!("admin0001");
     const VOTER1: &str = addr!("voter0001");
     const VOTER2: &str = addr!("voter0002");
@@ -696,6 +716,10 @@ mod tests {
             msgs: vec![],
             latest: None,
         }
+    }
+
+    fn get_balance(app: &App, address: impl Into<String>, denom: impl Into<String>) -> Uint128 {
+        app.wrap().query_balance(address, denom).unwrap().amount
     }
 
     #[test]
@@ -2299,7 +2323,7 @@ mod tests {
         app.execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
             .unwrap();
 
-        // Check that the deposit was transfered.
+        // Check that the deposit was transferred.
         let balance: cw20::BalanceResponse = app
             .wrap()
             .query_wasm_smart(
@@ -2538,5 +2562,153 @@ mod tests {
         // Make sure the deposit was returned despite the proposal failing.
         let balance = app.wrap().query_balance(OWNER, "TOKEN").unwrap();
         assert_eq!(balance.amount, Uint128::new(10));
+    }
+
+    #[test]
+    fn test_refund_proposal_deposit() {
+        let mut app = App::default();
+        const TEN: Uint128 = Uint128::new(10);
+        const ZERO: Uint128 = Uint128::new(0);
+
+        // Mint tokens for VOTER4.
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: VOTER4.to_string(), // weight 4
+            amount: vec![Coin {
+                amount: TEN,
+                denom: DENOM.into(),
+            }],
+        }))
+        .unwrap();
+
+        // VOTER4 should have 10 tokens.
+        assert_eq!(TEN, get_balance(&app, VOTER4, DENOM));
+
+        // Mint tokens for OWNER.
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: OWNER.to_string(), // weight 1
+            amount: vec![Coin {
+                amount: TEN,
+                denom: DENOM.into(),
+            }],
+        }))
+        .unwrap();
+
+        // OWNER should have 10 tokens.
+        assert_eq!(TEN, get_balance(&app, OWNER, DENOM));
+
+        // Initialize flex multisig contract with refund_failed_proposals set to true.
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            Threshold::AbsoluteCount { weight: 10 },
+            Duration::Height(10),
+            vec![],
+            true,
+            None,
+            Some(UncheckedDepositInfo {
+                amount: TEN,
+                denom: UncheckedDenom::Native(DENOM.into()),
+                refund_failed_proposals: true,
+            }),
+        );
+
+        // Proposer creates a proposal and locks 10 tokens deposit.
+        let proposal = text_proposal();
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            flex_addr.clone(),
+            &proposal,
+            &[Coin {
+                amount: TEN,
+                denom: DENOM.into(),
+            }],
+        )
+        .unwrap();
+
+        // Now, the OWNER should have 0 tokens.
+        assert_eq!(ZERO, get_balance(&app, OWNER, DENOM));
+
+        // Balance held by the contract should be 10 tokens.
+        assert_eq!(TEN, get_balance(&app, flex_addr.clone(), DENOM));
+
+        // Proposal should now be opened.
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id: 1 })
+            .unwrap();
+        assert_eq!(prop.status, Status::Open);
+
+        // Early rejection (before execution), because two voters vote 'No'.
+        // Total 'No' weight is 6, max remaining potential 'Yes' weight is 15 - 6 = 9.
+        // Because the required threshold is 10, so this proposal
+        // becomes rejected before execution.
+
+        // Vote 1.
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &ExecuteMsg::Vote {
+                proposal_id: 1,
+                vote: Vote::No,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Proposal should still be opened.
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id: 1 })
+            .unwrap();
+        assert_eq!(prop.status, Status::Open);
+
+        // Vote 2.
+        app.execute_contract(
+            Addr::unchecked(VOTER2),
+            flex_addr.clone(),
+            &ExecuteMsg::Vote {
+                proposal_id: 1,
+                vote: Vote::No,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Proposal should now be rejected.
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id: 1 })
+            .unwrap();
+        assert_eq!(prop.status, Status::Rejected);
+
+        // Balance for OWNER after refunding should be 10 tokens.
+        assert_eq!(TEN, get_balance(&app, OWNER, DENOM));
+
+        // Balance for contract after refunding should be 0 tokens.
+        assert_eq!(ZERO, get_balance(&app, flex_addr.clone(), DENOM));
+
+        // Vote 3
+        app.execute_contract(
+            Addr::unchecked(VOTER1),
+            flex_addr.clone(),
+            &ExecuteMsg::Vote {
+                proposal_id: 1,
+                vote: Vote::No,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Proposal is still rejected.
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id: 1 })
+            .unwrap();
+        assert_eq!(prop.status, Status::Rejected);
+
+        // Balance for OWNER is still 10 tokens (no double spending).
+        assert_eq!(TEN, get_balance(&app, OWNER, DENOM));
+
+        // Balance for contract is still 0 tokens.
+        assert_eq!(ZERO, get_balance(&app, flex_addr, DENOM));
     }
 }
