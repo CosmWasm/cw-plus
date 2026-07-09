@@ -4,10 +4,6 @@ use cw_utils::{Expiration, Threshold};
 
 use crate::{DepositInfo, Status, Vote};
 
-// we multiply by this when calculating needed_votes in order to round up properly
-// Note: `10u128.pow(9)` fails as "u128::pow` is not yet stable as a const fn"
-const PRECISION_FACTOR: u128 = 1_000_000_000;
-
 #[cw_serde]
 pub struct Proposal {
     pub title: String,
@@ -155,12 +151,13 @@ impl Votes {
     }
 }
 
-// this is a helper function so Decimal works with u64 rather than Uint128
-// also, we must *round up* here, as we need 8, not 7 votes to reach 50% of 15 total
+// This is a helper function so Decimal works with u64 rather than Uint128.
+// Also, we must *round up* here, as we need 8, not 7 votes to reach 50% of 15 total.
+// `percentage` must not exceed 1.0.
 fn votes_needed(weight: u64, percentage: Decimal) -> u64 {
-    let applied = Uint128::new(PRECISION_FACTOR * weight as u128).mul_floor(percentage);
-    // Divide by PRECISION_FACTOR, rounding up to the nearest integer
-    ((applied.u128() + PRECISION_FACTOR - 1) / PRECISION_FACTOR) as u64
+    assert!(percentage <= Decimal::one());
+    let out = Uint128::from(weight).mul_ceil(percentage);
+    out.u128() as u64 // cast is safe because percentage is <= 1.
 }
 
 // we cast a ballot with our chosen vote and a given weight
@@ -199,10 +196,36 @@ mod test {
         // round up right over 1
         assert_eq!(2, votes_needed(3, Decimal::permille(334)));
         assert_eq!(11, votes_needed(30, Decimal::permille(334)));
+        // round up to full number of votes
+        assert_eq!(420, votes_needed(420, Decimal::permille(999)));
 
         // exact matches don't round
         assert_eq!(17, votes_needed(34, Decimal::percent(50)));
         assert_eq!(12, votes_needed(48, Decimal::percent(25)));
+
+        for x in [
+            0,
+            1,
+            2,
+            3,
+            10,
+            17,
+            456,
+            2020,
+            7697987,
+            18446744073709552,
+            u64::MAX,
+        ] {
+            assert_eq!(votes_needed(x, Decimal::zero()), 0);
+            assert_eq!(votes_needed(x, Decimal::one()), x);
+            if x % 2 == 0 {
+                // even
+                assert_eq!(votes_needed(x, Decimal::percent(50)), x / 2);
+            } else {
+                // odd
+                assert_eq!(votes_needed(x, Decimal::percent(50)), x / 2 + 1);
+            }
+        }
     }
 
     fn setup_prop(
