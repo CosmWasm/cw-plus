@@ -1,6 +1,3 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Binary, Uint128};
 
@@ -64,7 +61,8 @@ pub struct TokenInfoResponse {
     pub total_supply: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
+#[derive(Default)]
 pub struct AllowanceResponse {
     pub allowance: Uint128,
     pub expires: Expiration,
@@ -79,7 +77,8 @@ pub struct MinterResponse {
     pub cap: Option<Uint128>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
+#[derive(Default)]
 pub struct MarketingInfoResponse {
     /// A URL pointing to the project behind this token.
     pub project: Option<String>,
@@ -106,7 +105,8 @@ pub struct AllowanceInfo {
     pub expires: Expiration,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
+#[derive(Default)]
 pub struct AllAllowancesResponse {
     pub allowances: Vec<AllowanceInfo>,
 }
@@ -118,12 +118,14 @@ pub struct SpenderAllowanceInfo {
     pub expires: Expiration,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
+#[derive(Default)]
 pub struct AllSpenderAllowancesResponse {
     pub allowances: Vec<SpenderAllowanceInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
+#[cw_serde]
+#[derive(Eq, Default)]
 pub struct AllAccountsResponse {
     pub accounts: Vec<String>,
 }

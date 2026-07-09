@@ -1,6 +1,3 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_schema::cw_serde;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -26,7 +23,8 @@ pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
 /// The format for sending an ics20 packet.
 /// Proto defined here: https://github.com/cosmos/cosmos-sdk/blob/v0.42.0/proto/ibc/applications/transfer/v1/transfer.proto#L11-L20
 /// This is compatible with the JSON serialization
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
+#[cw_serde]
+#[derive(Eq, Default)]
 pub struct Ics20Packet {
     /// amount of tokens to transfer is encoded as a string, but limited to u64 max
     pub amount: Uint128,
